@@ -39,38 +39,134 @@ class tech_params:
     f_cgs   = interpolate.interp1d(w, cgs  )
     f_cgd   = interpolate.interp1d(w, cgd  )
     
+    
 class amp(tech_params):
-    def __init__(self, )
-    
-class CG(tech_params):
-    
-    def __init__(self, Vov, WL, RL):
-        self.Vov = Vov
-        self.WL  = WL
-        self.RL  = RL
+    def __init__(self):
+        self.Vov1 = 0.2
+        self.Vov2 = 0.2
+        self.Vov3 = 0.2
+        self.Id_1 = 0.0001
+        self.Id_2 = 0.0001
+        self.Id_3 = 0.0001
+        self.R2   = 10000
+        self.R3   = 10000
         
-        self.gm = self.unCox * self.WL * self.Vov
-        self.Id = 0.5 * self.unCox * self.Vov**2
-        self.power = 5 * self.Id
+        self.gm1 = 0
+        self.gm2 = 0
+        self.gm3 = 0
+        self.R1 = 0
+        self.R4 = 0
+        self.A  = 0
         
-        # BW stuff
-        self.Cg = self.f_cgtot(self.WL)*1E-15
-        self.Rin = 1/self.gm
-        self.b1 = self.Rin * self.Cg
+        self.WL_1 = 1
+        self.WL_2 = 1
+        self.WL_3 = 1
+        
+        self.tran_res = 0
+        
+        self.C1 = 0
+        self.C2 = 0
+        self.C3 = 0
+        self.C4 = 0
+        
+        self.b11 = 0
+        self.b12 = 0
+        self.b13 = 0
+        self.b14 = 0
+        self.b1  = 0
+        self.w3dB = 0
+        
+    def print_all(self):
+        print(f'Vov1: {self.Vov1}')
+        print(f'Vov2: {self.Vov2}')
+        print(f'Vov3: {self.Vov3}')
+        print(f'Id_1: {self.Id_1}')
+        print(f'Id_2: {self.Id_2}')
+        print(f'Id_3: {self.Id_3}')
+        print(f'R2: {self.R2}')
+        print(f'R3: {self.R3}')
+        
+        print(f'gm1: {self.gm1}')
+        print(f'gm2: {self.gm2}')
+        print(f'gm3: {self.gm3}')
+        
+        print(f'WL_1: {self.WL_1}')
+        print(f'WL_2: {self.WL_2}')
+        print(f'WL_3: {self.WL_3}')
+        
+        print(f'A: {self.A}')
+        print('C1: %4.1ffF' %(1E+15*self.C1) )
+        print('C2: %4.1ffF' %(1E+15*self.C2) )
+        print('C3: %4.1ffF' %(1E+15*self.C3) )
+        print('C4: %4.1ffF' %(1E+15*self.C4) )
+        
+        print(f'b11: {self.b11}')
+        print(f'b12: {self.b12}')
+        print(f'b13: {self.b13}')
+        print(f'b14: {self.b14}')
+        print(f'b1:  {self.b1}')
+        print('w3dB: %4.1f MHz' %(self.w3dB/1000000) )
+        print('tran_res_gain: %5.0f kohms' %( self.gm2 * self.R2 * self.R3 ) )
+        print('power consumption: %2.2f mW' %( 5000*(self.Id_1 + self.Id_2 + self.Id_3)))
+        
+    def upd(self):
+        self.tran_res = -0.84 * self.R1 * self.gm2 * self.R2
+        
+        # calc gm's and R's
+        self.gm1 = 2*self.Id_1 / self.Vov1
+        self.gm2 = 2*self.Id_2 / self.Vov2
+        self.gm3 = 2*self.Id_3 / self.Vov3
+        self.R1 = 1/self.gm1
+        self.R4 = 1/self.gm3
+        self.A = self.gm2 * self.R2
+        
+        # calc W/L's
+        self.WL_1 = (2*self.Id_1) / (self.unCox*self.Vov1**2)
+        self.WL_2 = (2*self.Id_2) / (self.unCox*self.Vov2**2)
+        self.WL_3 = (2*self.Id_3) / (self.unCox*self.Vov3**2)
+        
+        # calc C's
+        self.C1 = 1E-15*( 100 + self.f_cstot(self.WL_1) )
+        self.C2 = 1E-15*( self.f_cdtot(self.WL_1) + self.f_cgs(self.WL_2) + (1+self.A)*self.f_cgd(self.WL_2) )
+        self.C3 = 1E-15*( self.f_cdtot(self.WL_2) - self.f_cgd(self.WL_2) + (1 + 1/self.A)*self.f_cgd(self.WL_2) + self.f_cgd(self.WL_3) + 0.14*self.f_cgs(self.WL_3) )
+        self.C4 = 1E-15*( -0.2*self.f_cgs(self.WL_3) + self.f_cstot(self.WL_3) - self.f_cgs(self.WL_3) + 250 )
+        
+        # calc b's
+        self.b11 = self.R1 * self.C1
+        self.b12 = self.R2 * self.C2
+        self.b13 = self.R3 * self.C3
+        self.b14 = self.R4 * self.C4
+        self.b1  = self.b11 + self.b12 + self.b13 + self.b14
         self.w3dB = 1/self.b1
         
-    def printout(self):
-        print(f'Vov: {self.Vov}v')
-        print(f'WL: {self.WL}')
-        print(f'RL: {(self.RL)/1000}kohms')
+     
         
-        print(f'gm: {self.gm}')
-        print('Id: %3.2fuA' %(self.Id*1000000) )
-        print('Power: %3.2fmW' %(self.power*1000) )
-        print(f'w3dB: {self.w3dB}')
+    def set_Vov1(self, Vov1):
+        self.Vov1 = Vov1
+    def set_Vov2(self, Vov2):
+        self.Vov2 = Vov2
+    def set_Vov3(self, Vov3):
+        self.Vov3 = Vov3
         
-CG_stage = CG(0.2, 20, 1000)
-CG_stage.printout()
+    def set_Id_1(self, Id_1):
+        self.Id_1 = Id_1
+    def set_Id_2(self, Id_2):
+        self.Id_2 = Id_2
+    def set_Id_3(self, Id_3):
+        self.Id_3 = Id_3
+        
+    def set_R1(self, R1):
+        self.R1 = R1
+    def set_R2(self, R2):
+        self.R2 = R2
+  
+        
+def unit_test_amp():
+    amp1 = amp()
+    amp1.upd()
+    amp1.print_all()
+
+unit_test_amp()
         
 #def calc_CG(Vov, WL, RL, Cin, Cout):
 #    # gain and power stuff
@@ -92,9 +188,6 @@ CG_stage.printout()
 #    
 #calc_CG(0.2, 20, 10000, 100E-15, 100E-15)
     
-    
-
-
 
 #%% CG single, second way
 # units of mv, kohms, uA
@@ -109,37 +202,29 @@ CG_stage.printout()
 #print(f'RL: {RL}')
 
 
-
-
-
-
-
-
-
-""" 
-calculate the bandwidth
-
-independent variables:
-    1. Vov1
-    2. Vov2
-    3. Vov3
-    4. W/L_1
-    5. W/L_2
-    6. W/L_3
-    7. R1
-    8. R2
-    
-independent variables:
-    1. Id1
-    2. Id2
-    3. Id3
-    4. gm1/Id1
-    5. gm2/Id2
-    6. gm3/Id3
-    7. R1
-    8. R2
-
-"""
-# give this function any six independent variables and it will calculate 
-# the remaining 2 from the gain
-#def calc_BW()
+#class CG(tech_params):
+#    
+#    def __init__(self, Vov, WL, RL):
+#        self.Vov = Vov
+#        self.WL  = WL
+#        self.RL  = RL
+#        
+#        self.gm = self.unCox * self.WL * self.Vov
+#        self.Id = 0.5 * self.unCox * self.Vov**2
+#        self.power = 5 * self.Id
+#        
+#        # BW stuff
+#        self.Cg = self.f_cgtot(self.WL)*1E-15
+#        self.Rin = 1/self.gm
+#        self.b1 = self.Rin * self.Cg
+#        self.w3dB = 1/self.b1
+#        
+#    def printout(self):
+#        print(f'Vov: {self.Vov}v')
+#        print(f'WL: {self.WL}')
+#        print(f'RL: {(self.RL)/1000}kohms')
+#        
+#        print(f'gm: {self.gm}')
+#        print('Id: %3.2fuA' %(self.Id*1000000) )
+#        print('Power: %3.2fmW' %(self.power*1000) )
+#        print(f'w3dB: {self.w3dB}')
