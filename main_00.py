@@ -5,11 +5,6 @@ from scipy import interpolate
 #%%
 
 
-#%% constants
-unCox = 0.00005
-
-
-
 #%% CG single, first way
 
 Vov1 = np.linspace(0.2, 0.3, 5)
@@ -20,47 +15,83 @@ RL = np.linspace(5000, 20000, 5)
 print(f'RL: {RL}')
 print()
 
-# input:  Vov, WL, RL
-# output: gain, BW, power
-class tech_params:
+    
+class tia:
+    
     unCox = 50E-6
+    upCox = 25E-6
+    # lookup table for l=1um nmos
+    wl_1u    = [2,     5,     10,    20,    50,    100,  200,  500,  1000, 2000]
+    cdtot_1u = [5.60,  9.50,  16.0,  29.0,  68.0,  134,  263,  653,  1303, 2603]
+    cgtot_1u = [3.45,  8.60,  17.2,  34.5,  86.3,  173,  345,  863,  1727, 3453]
+    cstot_1u = [5.62,  9.50,  16.1,  29.2,  68.5,  133,  265,  658,  1313, 2623]
+    cbtot_1u = [10.6,  17.6,  29.2,  52.3,  122,   238,  469,  1164, 2322, 4640]
+    cgs_1u   = [1.02,  2.55,  5.10,  10.2,  25.5,  50,   102,  255,  510,  1020]
+    cgd_1u   = [1.00,  2.50,  5.00,  10.0,  25.0,  51,   100,  250,  500,  1000]
+    cdtot_lookup_1u = interpolate.interp1d(wl_1u, cdtot_1u)
+    cgtot_lookup_1u = interpolate.interp1d(wl_1u, cgtot_1u)
+    cstot_lookup_1u = interpolate.interp1d(wl_1u, cstot_1u)
+    cbtot_lookup_1u = interpolate.interp1d(wl_1u, cbtot_1u)
+    cgs_lookup_1u   = interpolate.interp1d(wl_1u, cgs_1u  )
+    cgd_lookup_1u   = interpolate.interp1d(wl_1u, cgd_1u  )
     
-    w     = [2,     5,     10,    20,    50,    100,  200,  500,  1000, 2000]
-    cdtot = [5.60,  9.50,  16.0,  29.0,  68.0,  134,  263,  653,  1303, 2603]
-    cgtot = [3.45,  8.60,  17.2,  34.5,  86.3,  173,  345,  863,  1727, 3453]
-    cstot = [5.62,  9.50,  16.1,  29.2,  68.5,  133,  265,  658,  1313, 2623]
-    cbtot = [10.6,  17.6,  29.2,  52.3,  122,   238,  469,  1164, 2322, 4640]
-    cgs   = [1.02,  2.55,  5.10,  10.2,  25.5,  50,   102,  255,  510,  1020]
-    cgd   = [1.00,  2.50,  5.00,  10.0,  25.0,  51,   100,  250,  500,  1000]
-    f_cdtot = interpolate.interp1d(w, cdtot)
-    f_cgtot = interpolate.interp1d(w, cgtot)
-    f_cstot = interpolate.interp1d(w, cstot)
-    f_cbtot = interpolate.interp1d(w, cbtot)
-    f_cgs   = interpolate.interp1d(w, cgs  )
-    f_cgd   = interpolate.interp1d(w, cgd  )
+    # lookup table for l=1um
+    w_2u     = [2,     5,     10,    20,    50,    100,   200,   500]
+    wl_2u    = [1,     2.5,   5,     10,    25,    50,    100,   250]
+    cdtot_2u = [5.60,  9.50,  16.0,  29.0,  68.0,  133,   263,   653]
+    cgtot_2u = [4.91,  12.3,  24.5,  49.1,  123,   245,   490,   1227]
+    cstot_2u = [5.64,  9.60,  16.2,  29.4,  68.9,  135,   267,   663]
+    cbtot_2u = [12.1,  21.2,  36.3,  66.7,  158,   310,   613,   1523]
+    cgs_2u   = [1.04,  2.60,  5.20,  10.4,  26,    52,    103,   260]
+    cgd_2u   = [1.00,  2.50,  5.00,  10.0,  25.0,  50,    100,   250]
+    cdtot_lookup_2u = interpolate.interp1d(wl_2u, cdtot_2u)
+    cgtot_lookup_2u = interpolate.interp1d(wl_2u, cgtot_2u)
+    cstot_lookup_2u = interpolate.interp1d(wl_2u, cstot_2u)
+    cbtot_lookup_2u = interpolate.interp1d(wl_2u, cbtot_2u)
+    cgs_lookup_2u   = interpolate.interp1d(wl_2u, cgs_2u  )
+    cgd_lookup_2u   = interpolate.interp1d(wl_2u, cgd_2u  )
     
+    R_LDM = 10000 # ohms
+    C_LDM = 500   # fF
+    C_in  = 100   # fF
     
-class amp(tech_params):
     def __init__(self):
-        self.Vov1 = 0.2
-        self.Vov2 = 0.2
-        self.Vov3 = 0.2
-        self.Id_1 = 0.0001
-        self.Id_2 = 0.0001
-        self.Id_3 = 0.0001
-        self.R2   = 10000
-        self.R3   = 10000
+        self.Vov_1 = 0.2
+        self.Vov_2 = 0.2
+        self.Vov_3 = 0.2
+        self.Vov_B = 0.4
+        self.Vov_L = 0.6
+        self.I_ref= 2E-5
+        self.Id_1 = 3E-5
+        self.Id_2 = 6E-5
+        self.Id_3 = 3E-5
+        self.power = -1
         
         self.gm1 = 0
         self.gm2 = 0
         self.gm3 = 0
+        self.R_set = 20000
+        self.ro2= 0
         self.R1 = 0
+        self.R2 = 0
+        self.R3 = 0
         self.R4 = 0
-        self.A  = 0
+        self.A1 = 0
+        self.A2 = 0
         
-        self.WL_1 = 1
-        self.WL_2 = 1
-        self.WL_3 = 1
+        self.WL_1  = 100
+        self.WL_2  = 100
+        self.WL_3  = 100
+        
+        self.WL_L1 = 4
+        self.WL_L2 = 4
+        self.WL_B1 = 2
+        self.WL_B2 = 2
+        self.WL_B3 = 2
+        
+        self.WL_i1 = 2
+        self.WL_i2 = 2
+        self.WL_i3 = 2
         
         self.tran_res = 0
         
@@ -75,61 +106,186 @@ class amp(tech_params):
         self.b14 = 0
         self.b1  = 0
         self.w3dB = 0
+        self.f3dB_ZVTC = 0
+        
+        self.n = 50
+        self.f_sweep = np.logspace( 5, 9, self.n )
+        
+        self.mag_v_out  = np.zeros(self.n)
+        self.mag_in     = np.zeros(self.n)
+        self.mag_cg_out = np.zeros(self.n)
+        self.mag_cs_out = np.zeros(self.n)
+        
+        self.mag_v_out_lookup  = np.zeros(self.n)
+        self.mag_in_lookup     = np.zeros(self.n)
+        self.mag_cg_out_lookup = np.zeros(self.n)
+        self.mag_cs_out_lookup = np.zeros(self.n)
+        
+        self.f3dB_v_out  = -1
+        self.f3dB_in     = -1
+        self.f3dB_cg_out = -1
+        self.f3dB_cs_out = -1
         
     def print_all(self):
-        print(f'Vov1: {self.Vov1}')
-        print(f'Vov2: {self.Vov2}')
-        print(f'Vov3: {self.Vov3}')
-        print(f'Id_1: {self.Id_1}')
-        print(f'Id_2: {self.Id_2}')
-        print(f'Id_3: {self.Id_3}')
-        print(f'R2: {self.R2}')
-        print(f'R3: {self.R3}')
+        print('Vov_1: %1.2f  v' %self.Vov_1)
+        print('Vov_2: %1.2f  v' %self.Vov_2)
+        print('Vov_3: %1.2f  v' %self.Vov_3)
+        print('Vov_B: %1.2f  v' %self.Vov_B)
+        print('Vov_L: %1.2f  v' %self.Vov_L)
+        print()
         
-        print(f'gm1: {self.gm1}')
-        print(f'gm2: {self.gm2}')
-        print(f'gm3: {self.gm3}')
+        print('Id_1:  %3.1f uA' %(1E+6*self.Id_1))
+        print('Id_2:  %3.1f uA' %(1E+6*self.Id_2))
+        print('Id_3:  %3.1f uA' %(1E+6*self.Id_3))
+        print('I_ref: %3.1f uA' %(1E+6*self.I_ref))
+        print()
         
-        print(f'WL_1: {self.WL_1}')
-        print(f'WL_2: {self.WL_2}')
-        print(f'WL_3: {self.WL_3}')
+        print('gm1:   %3.2f   mA/V' %(1E+3*self.gm1))
+        print('gm2:   %3.2f   mA/V' %(1E+3*self.gm2))
+        print('gm3:   %3.2f   mA/V' %(1E+3*self.gm3))
+        print()
         
-        print(f'A: {self.A}')
-        print('C1: %4.1ffF' %(1E+15*self.C1) )
-        print('C2: %4.1ffF' %(1E+15*self.C2) )
-        print('C3: %4.1ffF' %(1E+15*self.C3) )
-        print('C4: %4.1ffF' %(1E+15*self.C4) )
+        print('R1:    %2.2f   kohms' %(1E-3*self.R1))
+        print('R_set: %2.2f   kohms' %(1E-3*self.R_set))
+        print('ro2:   %3.2f   kohms' %(1E-3*self.ro2))
+        print('R2:    %2.2f   kohms' %(1E-3*self.R2))
         
-        print(f'b11: {self.b11}')
-        print(f'b12: {self.b12}')
-        print(f'b13: {self.b13}')
-        print(f'b14: {self.b14}')
-        print(f'b1:  {self.b1}')
-        print('w3dB: %4.1f MHz' %(self.w3dB/1000000) )
-        print('tran_res_gain: %5.0f kohms' %( self.gm2 * self.R2 * self.R3 ) )
-        print('power consumption: %2.2f mW' %( 5000*(self.Id_1 + self.Id_2 + self.Id_3)))
+        print('R3:    %2.2f   kohms' %(1E-3*self.R3))
+        print('R4:    %2.2f   kohms' %(1E-3*self.R4))
+        print()
+        
+        print('WL_L1: %3.1f,  w=%3.1f' %(self.WL_L1, 2*self.WL_L1))
+        print('WL_1:  %3.1f' %(self.WL_1) )
+        print('WL_B1: %3.1f,  w=%3.1f' %(self.WL_B1, 2*self.WL_B1))
+        print()
+        
+        print('WL_L2: %3.1f,  w=%3.1f' %(self.WL_L2, 2*self.WL_L2))
+        print('WL_2:  %3.1f' %(self.WL_2) )
+        print('WL_B2: %3.1f,  w=%3.1f' %(self.WL_B2, 2*self.WL_B2))
+        print()
+        
+        print('WL_3:  %3.1f' %(self.WL_3) )
+        print('WL_B3: %3.1f,  w=%3.1f' %(self.WL_B3, 2*self.WL_B3))
+        print()
+        
+        print('WL_i1: %3.1f,  w=%3.1f' %(self.WL_i1, 2*self.WL_i1))
+        print('WL_i2: %3.1f,  w=%3.1f' %(self.WL_i2, 2*self.WL_i2))
+        print('WL_i3: %3.1f,  w=%3.1f' %(self.WL_i3, 2*self.WL_i3))
+        print()
+        
+        print('A1: %2.2f' %(self.A1) )
+        print('check1 A1: %2.2f' %( np.sqrt((self.WL_2) / self.WL_L2) ) )
+        print('check2 A1: %2.2f' %( self.Vov_L / (self.Vov_2) ) )
+        
+        print('R1:    %2.2f   kohms' %(1E-3*self.R1))
+        print('R_set: %2.2f   kohms' %(1E-3*self.R_set))
+        print('ro2:   %3.2f   kohms' %(1E-3*self.ro2))
+        print('R2:    %2.2f   kohms' %(1E-3*self.R2))
+        
+        print('R3:    %2.2f   kohms' %(1E-3*self.R3))
+        print('R4:    %2.2f   kohms' %(1E-3*self.R4))
+        print()
+        
+        print('A2: %2.2f' %(self.A2))
+        print('C1: %4.1f fF' %(1E+15*self.C1) )
+        print('C2: %4.1f fF' %(1E+15*self.C2) )
+        print('C3: %4.1f fF' %(1E+15*self.C3) )
+        print('C4: %4.1f fF' %(1E+15*self.C4) )
+        
+        print('b11: %3.2f ns' %(1E+9*self.b11) )
+        print('b12: %3.2f ns' %(1E+9*self.b12) )
+        print('b13: %3.2f ns' %(1E+9*self.b13) )
+        print('b14: %3.2f ns' %(1E+9*self.b14) )
+        print('b1:  %3.2f ns' %(1E+9*self.b1 ) )
+        
+        print('f3dB_in:    %3.2f MHz' %(self.f3dB_in/1E+6) )
+        print('f3dB_cg_out: %3.2f MHz' %(self.f3dB_cg_out/1E+6) )
+        print('f3dB_cs_out: %3.2f MHz' %(self.f3dB_cs_out/1E+6) )
+        print('f3dB_v_out: %3.2f MHz' %(self.f3dB_v_out/1E+6) )
+        print('f3dB_ZVTC:  %3.2f MHz' %(self.f3dB_ZVTC/1E+6) )
+        print()
+        print('tran_res_gain: %2.2f kohms, %2.2f dB' %( self.tran_res/1000, 20*np.log10(self.tran_res) ) )
+        print()
+        print('power consumption total: %2.2f mW' %( 1000*self.power1 ) )
+        print('power consumption Id: %2.2f mW' %( 1000*self.power2 ) )
+        print('power consumption ref: %2.2f mW' %( 1000*self.power3 ) )
+        print('power consumption resistors: %2.2f mW' %( 1000*self.power4 ) )
         
     def upd(self):
-        self.tran_res = -0.84 * self.R1 * self.gm2 * self.R2
-        
+        self.power1 = 2*5*(self.Id_1 + self.Id_2 + self.Id_3) + 5*self.I_ref + 50/(4*self.R_set)
+        self.power2 = 2*5*(self.Id_1 + self.Id_2 + self.Id_3) 
+        self.power3 = 5*self.I_ref
+        self.power4 = 50/(4*self.R_set)
         # calc gm's and R's
-        self.gm1 = 2*self.Id_1 / self.Vov1
-        self.gm2 = 2*self.Id_2 / self.Vov2
-        self.gm3 = 2*self.Id_3 / self.Vov3
-        self.R1 = 1/self.gm1
-        self.R4 = 1/self.gm3
-        self.A = self.gm2 * self.R2
+        self.gm1 = 2*self.Id_1 / self.Vov_1
+        self.gm2 = 2*self.Id_2 / self.Vov_2
+        self.gm3 = 2*self.Id_3 / self.Vov_3
+        self.gmL2= 2*self.Id_2 / self.Vov_L
+        self.ro2 = 1/(0.1*self.Id_2)
+        self.R1 = (1/self.gm1)
+        self.R2 = self.parallel(self.R_set, self.ro2)
+        self.R3 = 1 / self.gmL2
+        self.R4 = self.parallel( 0.84/self.gm3, self.R_LDM )
         
         # calc W/L's
-        self.WL_1 = (2*self.Id_1) / (self.unCox*self.Vov1**2)
-        self.WL_2 = (2*self.Id_2) / (self.unCox*self.Vov2**2)
-        self.WL_3 = (2*self.Id_3) / (self.unCox*self.Vov3**2)
+        self.WL_1  = (2*self.Id_1) / (self.unCox*self.Vov_1**2)
+        self.WL_2  = (2*self.Id_2) / (self.unCox*self.Vov_2**2)
+        self.WL_3  = (2*self.Id_3) / (self.unCox*self.Vov_3**2)
+        
+        self.WL_L1 = (2*self.Id_1) / (self.upCox*self.Vov_B**2)
+        self.WL_L2 = (2*self.Id_2) / (self.unCox*self.Vov_L**2)
+        
+        self.WL_B1 = (2*self.Id_1) / (self.unCox*self.Vov_B**2)
+        self.WL_B2 = (2*self.Id_2) / (self.unCox*self.Vov_B**2)
+        self.WL_B3 = (2*self.Id_3) / (self.unCox*self.Vov_B**2)
+        
+        self.WL_i1 = (2*self.I_ref) / (self.unCox*self.Vov_B**2)
+        self.WL_i2 = (2*self.I_ref) / (self.unCox*self.Vov_B**2)
+        self.WL_i3 = (2*self.I_ref) / (self.upCox*self.Vov_B**2)
+        
+        if self.WL_1 <= 2:
+            print('WL_1 = %2.2f, below range' %self.WL_1)
+        if self.WL_2 <= 2:
+            print('WL_2 = %2.2f, below range' %self.WL_2)
+        if self.WL_3 <= 2:
+            print('WL_3 = %2.2f, below range' %self.WL_3)
+            
+        if self.WL_L1 <= 1:
+            print('WL_L1 = %2.2f, below range' %self.WL_L1)
+        if self.WL_L2 <= 1:
+            print('WL_L2 = %2.2f, below range' %self.WL_L2)
+       
+        if self.WL_B1 <= 1:
+            print('WL_B1 = %2.2f, below range' %self.WL_B1)
+        if self.WL_B2 <= 1:
+            print('WL_B2 = %2.2f, below range' %self.WL_B2)
+        if self.WL_B3 <= 1:
+            print('WL_B3 = %2.2f, below range' %self.WL_B3)
+        
+        
+        self.A1 = ( self.WL_2 * self.Vov_2 ) / ( self.WL_L2 * self.Vov_L )
+        self.A2 = -self.gm3 * self.parallel( 0.84/self.gm3, self.R_LDM )
         
         # calc C's
-        self.C1 = 1E-15*( 100 + self.f_cstot(self.WL_1) )
-        self.C2 = 1E-15*( self.f_cdtot(self.WL_1) + self.f_cgs(self.WL_2) + (1+self.A)*self.f_cgd(self.WL_2) )
-        self.C3 = 1E-15*( self.f_cdtot(self.WL_2) - self.f_cgd(self.WL_2) + (1 + 1/self.A)*self.f_cgd(self.WL_2) + self.f_cgd(self.WL_3) + 0.14*self.f_cgs(self.WL_3) )
-        self.C4 = 1E-15*( -0.2*self.f_cgs(self.WL_3) + self.f_cstot(self.WL_3) - self.f_cgs(self.WL_3) + 250 )
+        self.C1 = 1E-15*( self.C_in 
+                        + self.cstot_lookup_1u(self.WL_1) 
+                        + self.cdtot_lookup_2u(self.WL_B1) )
+        
+        self.C2 = 1E-15*( self.cdtot_lookup_2u(self.WL_L1) 
+                        + self.cdtot_lookup_1u(self.WL_1) 
+                        + self.cgs_lookup_1u(self.WL_2) 
+                        + (1 + self.A1)*self.cgd_lookup_1u(self.WL_2) )
+        
+        self.C3 = 1E-15*( (1 + 1/self.A1)*self.cgd_lookup_1u(self.WL_2)
+                        + self.cdtot_lookup_1u(self.WL_2) - self.cgd_lookup_1u(self.WL_2)
+                        + self.cstot_lookup_2u(self.WL_L2)
+                        + self.cgd_lookup_1u(self.WL_3) 
+                        + (1 + self.A2)*self.cgs_lookup_1u(self.WL_3) )
+        
+        self.C4 = 1E-15*( (1 + 1/self.A2)*self.cgs_lookup_1u(self.WL_3)
+                        + self.cstot_lookup_1u(self.WL_3) - self.cgs_lookup_1u(self.WL_3) 
+                        - self.cdtot_lookup_2u(self.WL_B3) 
+                        + self.C_LDM )
         
         # calc b's
         self.b11 = self.R1 * self.C1
@@ -137,16 +293,51 @@ class amp(tech_params):
         self.b13 = self.R3 * self.C3
         self.b14 = self.R4 * self.C4
         self.b1  = self.b11 + self.b12 + self.b13 + self.b14
-        self.w3dB = 1/self.b1
+        self.f3dB_ZVTC = 1/(2*np.pi*self.b1)
+        
+        for i in range( np.size(self.f_sweep) ):
+            print(f'i: {i}')
+            s = 2j*np.pi*self.f_sweep[i]
+            print(f'freq: {self.f_sweep[i]/1000000} MHz')
+            
+            self.mag_in[i]     = np.abs(  (1/self.b11) / (s + 1/self.b11) )
+            self.mag_cg_out[i] = np.abs( ((1/self.b11)*(1/self.b12)) / ((s + 1/self.b11)*(s + 1/self.b12)) )
+            self.mag_cs_out[i] = np.abs( ((1/self.b11)*(1/self.b12)*(1/self.b13)) / ((s + 1/self.b11)*(s + 1/self.b12)*(s + 1/self.b13)) )
+            self.mag_v_out[i]  = np.abs( ((1/self.b11)*(1/self.b12)*(1/self.b13)*(1/self.b14)) / ((s + 1/self.b11)*(s + 1/self.b12)*(s + 1/self.b13)*(s + 1/self.b14)) )
+            print(f'mag_in:     {self.mag_in[i]}')
+            print(f'mag_cg_out: {self.mag_cg_out[i]}')
+            print(f'mag_cs_out: {self.mag_cs_out[i]}')
+            print(f'mag_v_out:  {self.mag_v_out[i]}')
+        
+        plt.plot( (self.f_sweep ), self.mag_in ) 
+        plt.plot( (self.f_sweep ), self.mag_cg_out ) 
+        plt.plot( (self.f_sweep ), self.mag_cs_out ) 
+        plt.plot( (self.f_sweep ), self.mag_v_out ) 
+                
+        self.mag_in_lookup     = interpolate.interp1d( self.mag_in,     self.f_sweep )
+        self.mag_cg_out_lookup = interpolate.interp1d( self.mag_cg_out, self.f_sweep )
+        self.mag_cs_out_lookup = interpolate.interp1d( self.mag_cs_out, self.f_sweep )
+        self.mag_v_out_lookup  = interpolate.interp1d( self.mag_v_out,  self.f_sweep )
+        
+        self.f3dB_in     = self.mag_in_lookup(0.71)
+        self.f3dB_cg_out = self.mag_cg_out_lookup(0.71)
+        self.f3dB_cs_out = self.mag_cs_out_lookup(0.71)
+        self.f3dB_v_out  = self.mag_v_out_lookup(0.71)
+        
+        self.tran_res = -self.R2*self.A1*self.A2
         
      
         
-    def set_Vov1(self, Vov1):
-        self.Vov1 = Vov1
-    def set_Vov2(self, Vov2):
-        self.Vov2 = Vov2
-    def set_Vov3(self, Vov3):
-        self.Vov3 = Vov3
+    def set_Vov_1(self, Vov_1):
+        self.Vov_1 = Vov_1
+    def set_Vov_2(self, Vov_2):
+        self.Vov_2 = Vov_2
+    def set_Vov_3(self, Vov_3):
+        self.Vov_3 = Vov_3
+    def set_Vov_L(self, Vov_L):
+        self.Vov_L = Vov_L
+    def set_Vov_B(self, Vov_B):
+        self.Vov_B = Vov_B
         
     def set_Id_1(self, Id_1):
         self.Id_1 = Id_1
@@ -155,18 +346,31 @@ class amp(tech_params):
     def set_Id_3(self, Id_3):
         self.Id_3 = Id_3
         
-    def set_R1(self, R1):
-        self.R1 = R1
-    def set_R2(self, R2):
-        self.R2 = R2
+    def set_R_set(self, R_set):
+        self.R_set = R_set
+        
+    def parallel(self, R1, R2):
+        return (R1*R2)/(R1+R2)
   
         
-def unit_test_amp():
-    amp1 = amp()
-    amp1.upd()
-    amp1.print_all()
+def unit_test_tia():
+    tia1 = tia()
+    
+    tia1.set_Vov_1( 0.25 )
+    tia1.set_Vov_2( 0.4 )
+    tia1.set_Vov_3( 0.3 )
+    tia1.set_Vov_L( 0.8 )
+    tia1.set_Vov_B( 0.8 )
+    
+    tia1.set_Id_1( 3E-5 )
+    tia1.set_Id_2( 2E-5 )
+    tia1.set_Id_3( 5E-5 )
+    tia1.set_R_set( 10E+3 )
+    
+    tia1.upd()
+    tia1.print_all()
 
-unit_test_amp()
+unit_test_tia()
         
 #def calc_CG(Vov, WL, RL, Cin, Cout):
 #    # gain and power stuff
