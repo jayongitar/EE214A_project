@@ -7,14 +7,46 @@ np.set_printoptions(precision=3)
 
 #%% CG single, first way
 
-Vov1 = np.linspace(0.2, 0.3, 5)
-print(f'Vov1: {Vov1}')
-WL_1 = np.linspace(10, 100, 5)
-print(f'WL_1: {WL_1}')
-RL = np.linspace(5000, 20000, 5)
-print(f'RL: {RL}')
-print()
+class tia_power_consumption:
+    def __init__(self):
+        self.Id_1 = 0
+        self.Id_2 = 0
+        self.Id_3 = 0
+        self.R = 0
+        self.I_ref = 0
+        
+    def set_R(R):
+        self.R = R
+        
+    def set_I_ref(I_ref):
+        self.I_ref
+        
+    def set_Ids(Id_1, Id_2, Id_3):
+        self.Id_1 = Id_1
+        self.Id_2 = Id_2
+        self.Id_3 = Id_3
+        self.upd_power()
+    
+    def upd_power(self):
+        self.power1 = 2*5*(self.Id_1 + self.Id_2 + self.Id_3) + 5*self.I_ref + 50/(4*self.R)
+        self.power2 = 2*5*(self.Id_1 + self.Id_2 + self.Id_3) 
+        self.power3 = 5*self.I_ref
+        self.power4 = 50/(4*self.R_set)
+        
+    def get_power(self):
+        return self.power1
+    
+    def print_power(self, n):
+        if n >= 0:
+            print('power consumption: {self.power1}')
+        if n == 0:
+            print('power consumption Ids:   {self.power2}')
+            print('power consumption I_ref: {self.power3}')
+            print('power consumption R:     {self.power4}')
 
+def unit_test_tia_power_consumption():
+    tia_power_module_test = tia_power_consumption()
+    tia_power_module_test.set_Ids(1.2, 5E-5)
     
 class tia:
     
@@ -56,16 +88,19 @@ class tia:
     C_in  = 100   # fF
     
     def __init__(self):
+        # configuration variables
         self.Vov_1 = 0.2
         self.Vov_2 = 0.2
         self.A_cs  = 3
         self.Vov_3 = 0.2
         self.Vov_B = 0.4
         self.Vov_L = 0.6
-        self.I_ref= 2E-5
         self.Id_1 = 3E-5
         self.Id_2 = 6E-5
         self.Id_3 = 3E-5
+        
+        
+        self.I_ref= 2E-5
         self.power1 = -1
         self.power2 = -1
         self.power3 = -1
@@ -220,10 +255,10 @@ class tia:
         print('FOM: %5.3f' %self.FOM)
         
     def upd(self):
-        self.power1 = 2*5*(self.Id_1 + self.Id_2 + self.Id_3) + 5*self.I_ref + 50/(4*self.R_set)
-        self.power2 = 2*5*(self.Id_1 + self.Id_2 + self.Id_3) 
-        self.power3 = 5*self.I_ref
-        self.power4 = 50/(4*self.R_set)
+        
+        # update mosfets
+        
+        
         # calc gm's and R's
         self.gm1 = 2*self.Id_1 / self.Vov_1
         self.gm2 = 2*self.Id_2 / self.Vov_2

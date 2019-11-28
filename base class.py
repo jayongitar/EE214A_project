@@ -58,7 +58,6 @@ class tia:
     def __init__(self):
         self.Vov_1 = 0.2
         self.Vov_2 = 0.2
-        self.A_cs  = 3
         self.Vov_3 = 0.2
         self.Vov_B = 0.4
         self.Vov_L = 0.6
@@ -235,13 +234,13 @@ class tia:
         self.R3 = 1 / self.gmL2
         self.R4 = self.parallel( 0.84/self.gm3, self.R_LDM )
         
-        # calc W/L = ( Id ) / ( 1/2*unCox*Vov^2 )
+        # calc W/L's
         self.WL_1  = (2*self.Id_1) / (self.unCox*self.Vov_1**2)
         self.WL_2  = (2*self.Id_2) / (self.unCox*self.Vov_2**2)
         self.WL_3  = (2*self.Id_3) / (self.unCox*self.Vov_3**2)
         
         self.WL_L1 = (2*self.Id_1) / (self.upCox*self.Vov_B**2)
-        self.WL_L2 = (2*self.Id_2) / (self.unCox*(self.Vov_2*self.A_cs)**2)
+        self.WL_L2 = (2*self.Id_2) / (self.unCox*self.Vov_L**2)
         
         self.WL_B1 = (2*self.Id_1) / (self.unCox*self.Vov_B**2)
         self.WL_B2 = (2*self.Id_2) / (self.unCox*self.Vov_B**2)
@@ -317,11 +316,10 @@ class tia:
 #            print(f'mag_cs_out: {self.mag_cs_out[i]}')
 #            print(f'mag_v_out:  {self.mag_v_out[i]}')
         
-        
-#        plt.plot( (self.f_sweep ), self.mag_in ) 
-#        plt.plot( (self.f_sweep ), self.mag_cg_out ) 
-#        plt.plot( (self.f_sweep ), self.mag_cs_out ) 
-#        plt.plot( (self.f_sweep ), self.mag_v_out ) 
+        plt.plot( (self.f_sweep ), self.mag_in ) 
+        plt.plot( (self.f_sweep ), self.mag_cg_out ) 
+        plt.plot( (self.f_sweep ), self.mag_cs_out ) 
+        plt.plot( (self.f_sweep ), self.mag_v_out ) 
                 
         self.mag_in_lookup     = interpolate.interp1d( self.mag_in,     self.f_sweep )
         self.mag_cg_out_lookup = interpolate.interp1d( self.mag_cg_out, self.f_sweep )
@@ -334,6 +332,7 @@ class tia:
         self.f3dB_v_out  = self.mag_v_out_lookup(0.71)
         
         self.gain = -self.R2*self.A1*self.A2
+        
         self.FOM = (self.gain*1E-3) * (self.f3dB_v_out*1E-6) / (self.power1*1E+3)
         
      
@@ -392,84 +391,97 @@ unit_test_tia()
 
 def sweep_params():
     tia2 = tia()
-    
+    n = 3
     Vov_1 = np.linspace(0.25, 0.5, n)
     Vov_2 = np.linspace(0.25, 0.5, n)
-    A_cs  = np.linspace(1, 3, 3)
-    Vov_3 = 0.3
-    Vov_L = 0.4
-    Vov_B = 0.4
+    Vov_3 = np.linspace(0.25, 0.5, n)
+    Vov_L = np.linspace(0.25, 0.5, n)
+    Vov_B = np.linspace(0.25, 0.5, n)
     Id_1  = np.linspace(1E-5, 1E-4, n)
     Id_2  = np.linspace(1E-5, 1E-4, n)
     Id_3  = np.linspace(1E-5, 1E-4, n)
     R_set = np.linspace(1E+3, 5E+4, n)
+                
+#    Vov_L = 0.5
+#    VoV_B = 0.5
+#    Id_1  = 3E-5
+#    Id_2  = 3E-5
+#    Id_3  = 3E-5
+#    R_set = 10000
+    
+#    Vov_L = np.linspace(0.25, 0.5, n)
+#    VoV_B = np.linspace(0.25, 0.5, n)
+#    Id_1  = np.linspace(1E-5, 1E-4, n)
+#    Id_2  = np.linspace(1E-5, 1E-4, n)
+#    Id_3  = np.linspace(1E-5, 1E-4, n)
+#    R_set = np.linspace(4E+3, 4E+4, n)
     
     """ sweep parameters with for loops
     put results in the pre-defined results matrix
     """
     print(f'total iterations: {n**3}')
-    print('size Vov: {shape(Vov_1)}')
-#    results = np.zeros(( n**9, 14))
-#    count=-1
-#    for ind_Vov_1 in range(np.size(Vov_1)):
-#        for ind_Vov_2 in range(np.size(Vov_2)):
-#            for ind_Vov_3 in range(np.size(Vov_3)):
-#                
-#                for ind_Vov_L in range(np.size(Vov_L)):
-#                    for ind_Vov_B in range(np.size(Vov_B)):
-#                        
-#                        for ind_Id_1 in range(np.size(Id_1)):
-#                            for ind_Id_2 in range(np.size(Id_2)):
-#                                for ind_Id_3 in range(np.size(Id_3)):
-#                                    
-#                                    for ind_R_set in range(np.size(R_set)):
-#                            
-#                
-#                                        count+=1
-#                                        print(f'count: {count}')
-#                                        tia2.set_Vov_1( Vov_1[ind_Vov_1] )
-#                                        tia2.set_Vov_2( Vov_2[ind_Vov_2] )
-#                                        tia2.set_Vov_3( Vov_3[ind_Vov_3] )
-#                                        tia2.set_Vov_L( Vov_L[ind_Vov_L] )
-#                                        tia2.set_Vov_B( Vov_B[ind_Vov_B] )
-#                                        tia2.set_Id_1(   Id_1[ind_Id_1]  )
-#                                        tia2.set_Id_2(   Id_2[ind_Id_2]  )
-#                                        tia2.set_Id_3(   Id_3[ind_Id_3]  )
-#                                        tia2.set_R_set(  R_set[ind_R_set])
-#                                        tia2.upd()
-#                
-#                                        results[count][0] = tia2.get_FOM()     # FOM
-#                                        results[count][1] = tia2.get_gain()    # gain
-#                                        results[count][2] = tia2.get_f3dB()    # f3dB
-#                                        results[count][3] = tia2.get_power()   # power
-#                                        results[count][4]  = Vov_1[ind_Vov_1]  # Vov_1
-#                                        results[count][5]  = Vov_2[ind_Vov_2]  # Vov_2
-#                                        results[count][6]  = Vov_3[ind_Vov_3]  # Vov_3
-#                                        results[count][7]  = Vov_L[ind_Vov_L]  # Vov_L
-#                                        results[count][8]  = Vov_B[ind_Vov_B]  # Vov_B
-#                                        results[count][9]  = Id_1[ind_Id_1]    # Id_1
-#                                        results[count][10] = Id_2[ind_Id_2]    # Id_2
-#                                        results[count][11] = Id_3[ind_Id_3]    # Id_3
-#                                        results[count][12] = R_set[ind_R_set]  # R_set
-#                
-#                
-#    print(f'results: {results}')
-#    print(f'results: {results[10,:]}')
-#    
-#    """ sort results matrix
-#    """
-#    FOMs = results[:,0]
-#    print(f'FOMs: {FOMs}')
-#    argsort_FOMs = np.argsort(FOMs)
-#    print(f'argsort_FOMs: {argsort_FOMs}')
-#    
-#    n_show = 3
-#    top_results = np.zeros((n_show, 12))
-#    for i in range(n_show):
-#        print(f'{i} top result:')
-#        top_results[i, :] = results[argsort_FOMs[-(i+1)], :]
-#        print('\tFOM: %1.2f,  gain: %2.2f kohms,  f3dB: %3.2f MHz,  power: %2.2f mW' %(top_results[i, 0], top_results[i, 1]*1E-3, top_results[i, 2]*1E-6, top_results[i, 3]*1E+3 ))
-##    print(f'top_results: {top_results}')
+    results = np.zeros(( n**9, 14))
+    count=-1
+    probe = 10
+    for ind_Vov_1 in range(np.size(Vov_1)):
+        for ind_Vov_2 in range(np.size(Vov_2)):
+            for ind_Vov_3 in range(np.size(Vov_3)):
+                
+                for ind_Vov_L in range(np.size(Vov_L)):
+                    for ind_Vov_B in range(np.size(Vov_B)):
+                        
+                        for ind_Id_1 in range(np.size(Id_1)):
+                            for ind_Id_2 in range(np.size(Id_2)):
+                                for ind_Id_3 in range(np.size(Id_3)):
+                                    
+                                    for ind_R_set in range(np.size(R_set)):
+                            
+                
+                                        count+=1
+                                        print(f'count: {count}')
+                                        tia2.set_Vov_1( Vov_1[ind_Vov_1] )
+                                        tia2.set_Vov_2( Vov_2[ind_Vov_2] )
+                                        tia2.set_Vov_3( Vov_3[ind_Vov_3] )
+                                        tia2.set_Vov_L( Vov_L[ind_Vov_L] )
+                                        tia2.set_Vov_B( Vov_B[ind_Vov_B] )
+                                        tia2.set_Id_1(   Id_1[ind_Id_1]  )
+                                        tia2.set_Id_2(   Id_2[ind_Id_2]  )
+                                        tia2.set_Id_3(   Id_3[ind_Id_3]  )
+                                        tia2.set_R_set(  R_set[ind_R_set])
+                                        tia2.upd()
+                
+                                        results[count][0] = tia2.get_FOM()     # FOM
+                                        results[count][1] = tia2.get_gain()    # gain
+                                        results[count][2] = tia2.get_f3dB()    # f3dB
+                                        results[count][3] = tia2.get_power()   # power
+                                        results[count][4]  = Vov_1[ind_Vov_1]  # Vov_1
+                                        results[count][5]  = Vov_2[ind_Vov_2]  # Vov_2
+                                        results[count][6]  = Vov_3[ind_Vov_3]  # Vov_3
+                                        results[count][7]  = Vov_L[ind_Vov_L]           
+                                        results[count][8]  = Vov_B[ind_Vov_B]
+                                        results[count][9]  = 3E-5
+                                        results[count][10] = 3E-5
+                                        results[count][11] = 3E-5
+                                        results[count][12] = 10E+3
+                
+                
+    print(f'results: {results}')
+    print(f'results: {results[10,:]}')
+    
+    """ sort results matrix
+    """
+    FOMs = results[:,0]
+    print(f'FOMs: {FOMs}')
+    argsort_FOMs = np.argsort(FOMs)
+    print(f'argsort_FOMs: {argsort_FOMs}')
+    
+    n_show = 3
+    top_results = np.zeros((n_show, 14))
+    for i in range(n_show):
+        print(f'{i} top result:')
+        top_results[i, :] = results[argsort_FOMs[-(i+1)], :]
+        print('\tFOM: %1.2f,  gain: %2.2f kohms,  f3dB: %3.2f MHz,  power: %2.2f mW' %(top_results[i, 0], top_results[i, 1]*1E-3, top_results[i, 2]*1E-6, top_results[i, 3]*1E+3 ))
+#    print(f'top_results: {top_results}')
         
     
     
