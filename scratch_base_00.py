@@ -3,63 +3,6 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 import time
 
-#%% power consumption
-class tia_power_consumption:
-    def __init__(self):
-        self.Id_1 = 0
-        self.Id_2 = 0
-        self.Id_3 = 0
-        self.R = 10000
-        self.I_ref = 0
-        self.power1 = 0
-        self.power2 = 0
-        self.power3 = 0
-        self.power4 = 0
-        
-    def set_R(self, R):
-        self.R = R
-        
-    def set_I_ref(self, I_ref):
-        self.I_ref
-        
-    def set_Ids(self, Id_1, Id_2, Id_3):
-        self.Id_1 = Id_1
-        self.Id_2 = Id_2
-        self.Id_3 = Id_3
-        self.upd_power()
-        
-    def set_params(self, ratio_1_to_3, fraction_2 ):
-        self.Id_1 = ( ratio_1_to_3 / (1 + ratio_1_to_3) )*(150E-6*(1-fraction_2))
-        self.Id_2 = 150E-6*fraction_2
-        self.Id_3 = ( 1 / (1 + ratio_1_to_3) )*(150E-6*(1-fraction_2))
-        self.upd_power()
-    
-    def upd_power(self):
-        self.power1 = 2*5*(self.Id_1 + self.Id_2 + self.Id_3) + 5*self.I_ref + 50/(4*self.R)
-        self.power2 = 2*5*(self.Id_1 + self.Id_2 + self.Id_3) 
-        self.power3 = 5*self.I_ref
-        self.power4 = 50/(4*self.R)
-        
-    def get_power(self):
-        return [self.power1, self.power2, self.power3, self.power4]
-    
-    def print_power(self, n):
-        if n >= 0:
-            print('total power consumption: %3.3f mw' %(self.power1/1000) )
-        if n == 1:
-            print('power consumption Ids:   %3.3f mw' %(self.power2/1000) )
-            print('power consumption I_ref: %3.3f mw' %(self.power3/1000) )
-            print('power consumption R:     %3.3f mw' %(self.power4/1000) )
-
-def unit_test_tia_power_consumption(test_type):
-    if test_type >= 0:
-        tia_power_module_test = tia_power_consumption()
-        tia_power_module_test.set_params(1.2, 5E-5)
-        tia_power_module_test.print_power(1)
-    
-
-#unit_test_tia_power_consumption(1)
-
 #%% MOSFET
 
 class mosfet:
@@ -325,7 +268,7 @@ unit_test_CG()
 #%% CG_lookup.  abstract CG stage to lookup3(Vov, Id, RL)
 class CG_LK(CG):
     _Vov = np.linspace(0.15, 0.3,  5)
-    _Id  = np.linspace(1E-5, 1E-4, 5)
+    _Id  = np.linspace(5E-6, 5E-5, 5)
     _RL  = np.linspace(1E+4, 4E+4, 5)
 #    print(f'_Vov: {_Vov}')
 #    print(f'_Id:  {_Id}')
@@ -341,47 +284,71 @@ class CG_LK(CG):
 #        print(f'n_Id:  {self.n_Id}')
 #        print(f'n_RL:  {self.n_RL}')
         
+        self.TI_data   = np.zeros((self.n_Vov, self.n_Id, self.n_RL))
         self.Rin_data  = np.zeros((self.n_Vov, self.n_Id, self.n_RL))
         self.Rout_data = np.zeros((self.n_Vov, self.n_Id, self.n_RL))
         self.Cin_data  = np.zeros((self.n_Vov, self.n_Id, self.n_RL))
         self.Cout_data = np.zeros((self.n_Vov, self.n_Id, self.n_RL))
-        self.TI_data   = np.zeros((self.n_Vov, self.n_Id, self.n_RL))
         
         for i in range(self.n_Vov):
             for j in range(self.n_Id):
                 for k in range(self.n_RL):
 #                    print(f'i: {i}, j: {j}, k: {k}')
                     super()._set(self._Vov[i], self._Id[j], self._RL[k])
+                    self.TI_data  [i,j,k] = super().get_TI()
                     self.Rin_data [i,j,k] = super().get_Rin()
                     self.Rout_data[i,j,k] = super().get_Rout()
                     self.Cin_data [i,j,k] = super().get_Cin()
                     self.Cout_data[i,j,k] = super().get_Cout()
-                    self.TI_data  [i,j,k] = super().get_TI()
+        self.TI_f   = RegularGridInterpolator((self._Vov, self._Id, self._RL), self.TI_data)
         self.Rin_f  = RegularGridInterpolator((self._Vov, self._Id, self._RL), self.Rin_data)
         self.Rout_f = RegularGridInterpolator((self._Vov, self._Id, self._RL), self.Rout_data)
         self.Cin_f  = RegularGridInterpolator((self._Vov, self._Id, self._RL), self.Cin_data)
         self.Cout_f = RegularGridInterpolator((self._Vov, self._Id, self._RL), self.Cout_data)
-        self.TI_f   = RegularGridInterpolator((self._Vov, self._Id, self._RL), self.TI_data)
+        
+    def check_input(self, Vov, Id, RL):
+        if Vov < self._Vov[0]:
+            print('Vov_1 under range')
+        if Vov > self._Vov[-1]:
+            print('Vov_1 over range')
+            
+        if Id < self._Id[0]:
+            print('Id_1 under range')
+        if Id > self._Id[-1]:
+            print('Id_1 over range')
+            
+        if RL < self._RL[0]:
+            print('RL under range')
+        if RL > self._RL[-1]:
+            print('RL over range')
+            
                 
+    def get_TI(self, Vov, Id, RL):
+        return self.check_input(Vov, Id, RL)
     def get_Rin(self, Vov, Id, RL):
+        self.check_input(Vov, Id, RL)
         return self.Rin_f([Vov, Id, RL])
     def get_Rout(self, Vov, Id, RL):
+        self.check_input(Vov, Id, RL)
         return self.Rout_f([Vov, Id, RL])
     def get_Cin(self, Vov, Id, RL):
+        self.check_input(Vov, Id, RL)
         return self.Cin_f([Vov, Id, RL])
     def get_Cout(self, Vov, Id, RL):
+        self.check_input(Vov, Id, RL)
         return self.Cout_f([Vov, Id, RL])
-    def get_TI(self, Vov, Id, RL):
-        return self.TI_f([Vov, Id, RL])
 
 def CG_LK_unit_test(Vov, Id, RL):
     print('--- CG_LK_unit_test ----------------')
-    cg = CG_LK()
-    ee.print_A('   TI', 'ohms', cg.get_TI(Vov, Id, RL))
-    ee.print_R('   Rin ', cg.get_Rin (Vov, Id, RL))
-    ee.print_R('   Rout', cg.get_Rout(Vov, Id, RL))
-    ee.print_C('   Cin ', cg.get_Cin (Vov, Id, RL))
-    ee.print_C('   Cout', cg.get_Cout(Vov, Id, RL))
+    try:
+        cg = CG_LK()
+        ee.print_A('   TI', 'ohms', cg.get_TI(Vov, Id, RL))
+        ee.print_R('   Rin ', cg.get_Rin (Vov, Id, RL))
+        ee.print_R('   Rout', cg.get_Rout(Vov, Id, RL))
+        ee.print_C('   Cin ', cg.get_Cin (Vov, Id, RL))
+        ee.print_C('   Cout', cg.get_Cout(Vov, Id, RL))
+    except:
+        pass
     print('------------------------------------\n')
     
 CG_LK_unit_test(0.2, 1E-4, 10000)
@@ -451,9 +418,9 @@ class CS_LK(CS):
         self.n_Vov = self._Vov.shape[0]
         self.n_Id  = self._Id.shape[0]
         self.n_A1= self._A1.shape[0]
-        print(f'n_Vov: {self.n_Vov}')
-        print(f'n_Id:  {self.n_Id}')
-        print(f'n_A1:  {self.n_A1}')
+#        print(f'n_Vov: {self.n_Vov}')
+#        print(f'n_Id:  {self.n_Id}')
+#        print(f'n_A1:  {self.n_A1}')
         
         self.Rin_data  = np.zeros((self.n_Vov, self.n_Id, self.n_A1))
         self.Rout_data = np.zeros((self.n_Vov, self.n_Id, self.n_A1))
@@ -477,15 +444,37 @@ class CS_LK(CS):
         self.Cout_f = RegularGridInterpolator((self._Vov, self._Id, self._A1), self.Cout_data)
         self.A1_f   = RegularGridInterpolator((self._Vov, self._Id, self._A1), self.A1_data)
                 
+        
+    def check_input(self, Vov, Id, A1):
+        if Vov < self._Vov[0]:
+            print('Vov_2 under range')
+        if Vov > self._Vov[-1]:
+            print('Vov_2 over range')
+            
+        if Id < self._Id[0]:
+            print('Id_2 under range')
+        if Id > self._Id[-1]:
+            print('Id_2 over range')
+            
+        if A1 < self._A1[0]:
+            print('A1 under range')
+        if A1 > self._A1[-1]:
+            print('A1 over range')\
+            
     def get_Rin(self, Vov, Id, A1):
+        self.check_input(Vov, Id, A1)
         return self.Rin_f ([Vov, Id, A1])
     def get_Rout(self, Vov, Id, A1):
+        self.check_input(Vov, Id, A1)
         return self.Rout_f([Vov, Id, A1])
     def get_Cin(self, Vov, Id, A1):
+        self.check_input(Vov, Id, A1)
         return self.Cin_f ([Vov, Id, A1])
     def get_Cout(self, Vov, Id, A1):
+        self.check_input(Vov, Id, A1)
         return self.Cout_f([Vov, Id, A1])
     def get_A1(self, Vov, Id, A1):
+        self.check_input(Vov, Id, A1)
         return self.A1_f([Vov, Id, A1])
     
 def CS_LK_unit_test():
@@ -505,8 +494,8 @@ CS_LK_unit_test()
 class CD(mosfet):
     
     def __init__(self):
-        self.M3    = mosfet(0, 0)
-        self.A2    = -0.84
+        self.M3   = mosfet(0, 0)
+        self.A2   = -0.84
         self.Rin  = -1
         self.Cin  = -1
         self.Rout = -1
@@ -565,8 +554,6 @@ class CD_LK(CD):
         self.Rout_data = np.zeros((self.n_Vov, self.n_Id))
         self.Cin_data  = np.zeros((self.n_Vov, self.n_Id))
         self.Cout_data = np.zeros((self.n_Vov, self.n_Id))
-        print(f'n_Vov: {self.n_Vov}')
-        print(f'n_Id:  {self.n_Id}')
         for i in range(self.n_Vov):
             for j in range(self.n_Id):
 #                print(f'i: {i}, j: {j}')
@@ -582,15 +569,31 @@ class CD_LK(CD):
         self.Cin_f  = RegularGridInterpolator((self._Vov, self._Id), self.Cin_data)
         self.Cout_f = RegularGridInterpolator((self._Vov, self._Id), self.Cout_data)
     
+    def check_input(self, Vov, Id):
+        if Vov < self._Vov[0]:
+            print('Vov_3 under range')
+        if Vov > self._Vov[-1]:
+            print('Vov_3 over range')
+            
+        if Id < self._Id[0]:
+            print('Id_3 under range')
+        if Id > self._Id[-1]:
+            print('Id_3 over range')
+            
     def get_A2(self, Vov, Id):
+        self.check_input(Vov, Id)
         return self.A2_f([Vov, Id])
     def get_Rin(self, Vov, Id):
+        self.check_input(Vov, Id)
         return self.Rin_f([Vov, Id])
     def get_Rout(self, Vov, Id):
+        self.check_input(Vov, Id)
         return self.Rout_f([Vov, Id])
     def get_Cin(self, Vov, Id):
+        self.check_input(Vov, Id)
         return self.Cin_f([Vov, Id])
     def get_Cout(self, Vov, Id):
+        self.check_input(Vov, Id)
         return self.Cout_f([Vov, Id])
         
 def CD_LK_unit_test():
@@ -628,11 +631,11 @@ class PCM():
     
     def _print(self):
         print('--- PCM ------------------------')
-        print('V1:        %3.3f V'    %self.V1)
-        print('R_LCG:     %1.3f kohms' %(1E-3*self.R_LCG))
-        print('Ru:        %1.3f kohms' %(1E-3*self.Ru))
-        print('Rd:        %1.3f kohms' %(1E-3*self.Rd))
-        print('p_Res:     %3.1f mW' %(1E+3*self.p_Id_half))
+        print('V1:        %1.3f V'    %self.V1)
+        print('R_LCG:     %2.3f kohms' %(1E-3*self.R_LCG))
+        print('Ru:        %2.3f kohms' %(1E-3*self.Ru))
+        print('Rd:        %2.3f kohms' %(1E-3*self.Rd))
+        print('p_Res:     %1.3f mW' %(1E+3*self.p_Res))
         print('ratio_1:   %1.2f' %self.ratio_1)
         print('ratio_2:   %1.2f' %self.ratio_2)
         print('Id_half:   %3.1f uA' %(1E+6*self.Id_half))
@@ -647,8 +650,12 @@ class PCM():
         self.V1      = V1
         self.ratio_1 = ratio_1
         self.ratio_2 = ratio_2
+        self._upd()
         
-        self.p_Res     = (2.5-self.V1)**2/self.Ru - (2.5+self.V1)**2/self.Rd
+    def _upd(self):
+        self.Ru   = self.R_LCG*(5/(2.5+self.V1))
+        self.Rd   = self.R_LCG*(5/(2.5-self.V1))
+        self.p_Res     = (2.5)**2 / self.Rd + (2.5)**2 / self.Rd
         self.p_Id_half = 0.5*(self.p_total - self.p_I_ref) - self.p_Res
         self.Id_half  = self.p_Id_half/self.Vsup
         
@@ -666,140 +673,6 @@ class PCM():
         
 def PCM_unit_test():
     pcm = PCM()
-    pcm._print()
-    pcm._set(1E+4, 0.5, 1, 0.2)
+    pcm._set(1.5E+4, 0, 1, 0.2)
     
 PCM_unit_test()
-
-#%% TIA
-
-class TIA(CG_LK, CS_LK, CD_LK, PCM):
-    
-    def __init__(self):
-        self.CG_LK = CG_LK()
-        self.CS_LK = CS_LK()
-        self.CD_LK = CD_LK()
-        self.pcm = PCM()
-        # inputs
-        self.Vov_1     = -1
-        self.Vov_2     = -1
-        self.Vov_3     = -1
-        self.R_LCG     = -1
-        self.V1        = -1
-        self.ratio_1   = -1
-        self.ratio_2   = -1
-        # outputs
-        self.A1    = -1
-        self.power = -1
-        self.gain  = -1
-        self.BW    = -1
-        self.FOM   = -1
-        
-    def _print(self):
-        print('\nTIA inputs:')
-        print('Vov_1:   %3.3f V' %self.Vov_1)
-        print('Vov_2:   %3.3f V' %self.Vov_2)
-        print('Vov_3:   %3.3f V' %self.Vov_3)
-        print('R_LCG:   %3.1f kohms' %(1E-3*self.R_LCG))
-        print('V1:      %3.3f V'    %self.V1)
-        print('ratio_1: %3.3f' %self.ratio_1)
-        print('ratio_2: %3.3f' %self.ratio_2)
-        
-        print('TIA outputs:')
-        print('A1:    %3.3f'     %self.A1)
-        print('power: %3.2f mw'  %(1E+3*self.power))
-        print('gain:  %3.3f kohms' %(1E-3*self.gain))
-        print('BW:    %3.1f MHz' %(1E-6*self.BW))
-        print('FOM:   %3.3f V'   %self.FOM)
-       
-    def _set(self, Vov_1, Vov_2, Vov_3, R_LCG, V1, ratio_1, ratio_2):
-        self.Vov_1 = Vov_1
-        self.Vov_2 = Vov_2
-        self.Vov_3 = Vov_3
-        self.R_LCG = R_LCG
-        self.V1    = V1
-        self.ratio_1 = ratio_1
-        self.ratio_2 = ratio_2
-        
-        self.pcm._set(self.R_LCG, self.V1, self.ratio_1, self.ratio_2)
-        self.CG_LK.get()
-        
-        
-        
- 
-def TIA_unit_test():
-    tia = TIA()
-    tia._set(0.2, 0.2, 0.2, 1E+4, 0, 1, 0.2)
-    tia._print()
-
-TIA_unit_test()
-
-
-
-#%% Sweep
-
-class SWEEP(TIA):
-    
-    _Vov_1     = np.linspace(0.2, 0.3, 2)
-    _Vov_2     = np.linspace(0.2, 0.3, 2)
-    _Vov_3     = np.linspace(0.2, 0.3, 2)
-    _I_ratio_1 = np.linspace(0.7, 1.4, 2)
-    _I_ratio_2 = np.linspace(0.8, 1.25,2)
-    _A1        = np.linspace(0.2, 0.3, 2)
-    _RL        = np.linspace(2E+4,3E+4,2)
-    
-    def __init__(self):
-        self.CG_LK = CG_LK()
-        self.CS_LK = CS_LK()
-        self.CD_LK = CD_LK()
-        
-        # variables
-        self.Vov_1 = -1
-        self.Id_1  = -1
-        self.RL    = -1
-        
-        self.Vov_2 = -1
-        self.Id_2  = -1
-        self.A1    = -1
-        
-        self.Vov_3 = -1
-        self.Id_3  = -1 
-        
-        # parameters
-        self.I_ratio_1 = -1
-        self.I_ratio_2 = -1
-        
-    
-    def iterate(self):
-        start_ms = int(round(time.time() * 1000))
-        count = -1
-        max_count = self._Vov_1.shape[0]*self._Vov_2.shape[0]*self._Vov_3.shape[0]*self._I_ratio_1.shape[0]*self._I_ratio_2.shape[0]*self._A1.shape[0]*self._RL.shape[0]
-        for ind_Vov_1 in range(self._Vov_1.shape[0]):
-            for ind_Vov_2 in range(self._Vov_2.shape[0]):
-                for ind_Vov_3 in range(self._Vov_3.shape[0]):
-                    for ind_I_ratio_1 in range(self._I_ratio_1.shape[0]):
-                        for ind_I_ratio_2 in range(self._I_ratio_2.shape[0]):
-                            for ind_A1 in range(self._A1.shape[0]):
-                                for ind_RL in range(self._RL.shape[0]):
-                                    count+=1
-                                    print(f'count: {count}')
-                                
-                                
-                               
-                                
-                                
-
-        print(f'max_count: {max_count}')
-        end_ms = int(round(time.time() * 1000))
-        print(f'total time: {end_ms-start_ms} ms')
-    
-def SWEEP_unit_test():
-    sweep = SWEEP()
-    sweep.iterate()
-
-#SWEEP_unit_test()
-
-
-
-
-
