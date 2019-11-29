@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
+import time
 
 #%% power consumption
 class tia_power_consumption:
@@ -593,18 +594,84 @@ def CD_LK_unit_test():
     
 CD_LK_unit_test()
 
-##%% TIA
-#class TIA(CG, CS, CD):
-#    def __init__(self):
-#        self.CG = CG()
-#        self.CS = CS()
-#        self.CD = CD()
-#        self.Cin  = 100
-#        self.Rout = 1E+4
-#        self.Cout = 500
+#%% Power
+class PCM():
+    I_ref = 1E-5
+    vdd   = 5.
+    p_total = 1.5E-3
+    
+    def __init__(self):
+        self.Id_1 = -1
+        self.Id_2 = -1
+        self.Id_3 = -1
+        self.R    = -1
+        
+        self.p_I_ref = self.vdd*self.I_ref
+        self.p_R
+        self.p_
         
 
 
+#%% TIA
+
+class TIA(CG_LK, CS_LK, CD_LK):
+    
+    _Vov_1     = np.linspace(0.2, 0.3, 2)
+    _Vov_2     = np.linspace(0.2, 0.3, 5)
+    _Vov_3     = np.linspace(0.2, 0.3, 2)
+    _Id_2_frac = np.linspace(0.2, 0.3, 5)
+    _Id_1o3    = np.linspace(0.8, 1.25, 5)
+    _A1        = np.linspace(2, 4, 5)
+    _RL        = np.linspace(1E+4, 2E+4, 5)
+    
+    def __init__(self):
+        self.CG_LK = CG_LK()
+        self.CS_LK = CS_LK()
+        self.CD_LK = CD_LK()
+        
+        # variables
+        self.Vov_1 = -1
+        self.Id_1  = -1
+        self.RL    = -1
+        
+        self.Vov_2 = -1
+        self.Id_2  = -1
+        self.A1    = -1
+        
+        self.Vov_3 = -1
+        self.Id_3  = -1 
+        
+        # parameters
+        self.Id_2_frac = -1
+        self.Id_1o3    = -1
+        
+    
+    def iterate(self):
+        start_ms = int(round(time.time() * 1000))
+        count = -1
+        max_count = self._Vov_1.shape[0]*self._Vov_2.shape[0]*self._Vov_3.shape[0]*self._Id_2_frac.shape[0]*self._Id_1o3.shape[0]*self._A1.shape[0]
+        for ind_Vov_1 in range(self._Vov_1.shape[0]):
+            for ind_Vov_2 in range(self._Vov_2.shape[0]):
+                for ind_Vov_3 in range(self._Vov_3.shape[0]):
+                    for ind_Id_2_frac in range(self._Id_2_frac.shape[0]):
+                        for ind_Id_1o3 in range(self._Id_1o3.shape[0]):
+                            for ind_A1 in range(self._A1.shape[0]):
+                                for ind_RL in range(self._RL.shape[0]):
+                                    count+=1
+                                    print(f'count: {count}')
+                                
+                                
+                               
+                                
+                                
+
+        print(f'max_count: {max_count}')
+        end_ms = int(round(time.time() * 1000))
+        print(f'loop time: {end_ms-start_ms} ms')
+    
+
+tia = TIA()
+tia.iterate()
 
 
 
