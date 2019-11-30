@@ -5,70 +5,33 @@ import time
 
 #%% TIA
 
-class TIA(CG_LK, CS_LK, CD_LK, PCM):
+class TIA(CG, CS, CD, PCM):
     
     def __init__(self):
-        self.cg_LK = CG_LK()
-        self.cs_LK = CS_LK()
-        self.cd_LK = CD_LK()
+        self.cg = CG()
+        self.cs = CS()
+        self.cd = CD()
         self.pcm = PCM()
-        
         # inputs
-        self.Vov_1     = -1
-        self.Vov_2     = -1
-        self.Vov_3     = -1
-        
-        # stage parameters
-        self.Cin     = 100E-15
-        
-        self.mag_A0  = -1
-        self.Rin_CG  = -1
-        self.Rout_CG = -1
-        self.Cin_CG  = -1
-        self.Cout_CG = -1
-        
-        self.mag_A1  = -1
-        self.Rin_CS  = -1
-        self.Rout_CS = -1
-        self.Cin_CS  = -1
-        self.Cout_CS = -1
-        
-        self.mag_A2  = -1
-        self.Rin_CD  = -1
-        self.Rout_CD = -1
-        self.Cin_CD  = -1
-        self.Cout_CD = -1
-        
-        self.Rout    = 1E+4
-        self.Cout    = 500E-15
-        self.mag_A3  = -1
-        
-        # gain and pole location
-        self.mag_A0 = -1
-        self.C0     = -1
-        self.R0     = -1
-        self.p0     = -1
-        self.mag_A1 = -1
-        self.C1     = -1
-        self.R1     = -1
-        self.p1     = -1
-        self.mag_A2 = -1
-        self.C2     = -1
-        self.R2     = -1
-        self.p2     = -1
-        self.mag_A3 = -1
-        self.C3     = -1
-        self.R3     = -1
-        self.p3     = -1
-        
+        self.Vov_1 = -1
+        self.Vov_2 = -1
+        self.Vov_3 = -1
+        self.Vov_L = -1
+        self.Vov_B = -1
+        # stage parameters: mag, Rin, Rout, Cin, Cout
+        self.CG_list = [-1, -1, -1, -1, -1]
+        self.CS_list = [-1, -1, -1, -1, -1]
+        self.CD_list = [-1, -1, -1, -1, -1]
+        # BW:  R, C, P [MHz]
+        self.sys1_list = [-1, -1, -1]
+        self.sys2_list = [-1, -1, -1]
+        self.sys3_list = [-1, -1, -1]
+        self.sys4_list = [-1, -1, -1]
         # outputs
         self.power = -1
         self.gain  = -1
-        self.f3dB_0= -1
-        self.f3dB_1= -1
-        self.f3dB_2= -1
-        self.f3dB_3= -1
         self.f3dB  = -1
+        self.f3dB_list = [-1, -1, -1, -1]
         self.FOM   = -1
         
     def _print_input(self):
@@ -77,14 +40,15 @@ class TIA(CG_LK, CS_LK, CD_LK, PCM):
         print('   Vov_1:   %3.3f V' %self.Vov_1)
         print('   Vov_2:   %3.3f V' %self.Vov_2)
         print('   Vov_3:   %3.3f V' %self.Vov_3)
+        
+        print('   Vov_N:   %3.3f V' %self.Vov_2)
+        print('   Vov_3:   %3.3f V' %self.Vov_3)
+        
         print('   R_LCG:   %3.1f kohms' %(1E-3*self.pcm.R_LCG))
         print('   V1:      %3.3f V'    %self.pcm.V1)
         print('   ratio_1: %3.3f' %self.pcm.ratio_1)
         print('   ratio_2: %3.3f' %self.pcm.ratio_2)
     
-    def _print_pcm(self):
-        self.pcm._print()
-        
     def _print_output(self):
         print('TIA outputs:')
 #        print('   power: %3.2f mw'  %(1E+3*self.power))
@@ -166,27 +130,6 @@ class TIA(CG_LK, CS_LK, CD_LK, PCM):
         self.Cin_CS  = self.cs_LK.get_Cin (self.Vov_2, self.pcm.Id_2, self.mag_A1)
         self.Cout_CS = self.cs_LK.get_Cout(self.Vov_2, self.pcm.Id_2, self.mag_A1)
         
-#        print(f'mag_A0:  {self.mag_A0}')
-#        print(f'mag_A1:  {self.mag_A1}')
-#        print(f'mag_A2:  {self.mag_A2}')
-#        print(f'mag_A3:  {self.mag_A3}')
-#        print()
-#        print(f'Rin_CG:  {self.Rin_CG}')
-#        print(f'Rout_CG: {self.Rout_CG}')
-#        print(f'Cin_CG:  {self.Cin_CG}')
-#        print(f'Cout_CG: {self.Cout_CG}')
-#        print()
-#        print(f'Rin_CS:  {self.Rin_CS}')
-#        print(f'Rout_CS: {self.Rout_CS}')
-#        print(f'Cin_CS:  {self.Cin_CS}')
-#        print(f'Cout_CS: {self.Cout_CS}')
-#        print()
-#        print(f'Rin_CD:  {self.Rin_CD}')
-#        print(f'Rout_CD: {self.Rout_CD}')
-#        print(f'Cin_CD:  {self.Cin_CD}')
-#        print(f'Cout_CD: {self.Cout_CD}')
-        
-            
         self.C0     = self.Cin_CG + self.Cin
         self.R0     = self.Rin_CG
         self.p0     = -1/(6.28*1E-15*self.C0*self.R0)

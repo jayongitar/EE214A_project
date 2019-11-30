@@ -112,7 +112,7 @@ class mosfet:
             self.W  = self.WL*(self.type-1)
         # check WL limits
         if self.WL <= 2 or self.WL > 2000:
-            print(f'out of range: \n   Vov = {self.Vov} \n   Id = {self.Id} \n   WL={self.WL}')
+            print(f'_mosfet: out of range parameter: \n   Vov = {self.Vov} \n   Id = {self.Id} \n   WL={self.WL}')
         # gm = 2*Id/Vov
         self.gm = 2*self.Id/self.Vov
         self.gmp= 1.2*self.gm
@@ -179,6 +179,12 @@ def unit_test_mosfet(test_type):
 class ee:
     @staticmethod
     def parallel(R1, R2):
+        if R1 > 1E+20 and R2 > 1E+20:
+            return 1E+21
+        if R1 > 1E+20 and R2 < 1E+20:
+            return R2
+        if R2 > 1E+20 and R1 < 1E+20:
+            return R1
         return (R1*R2)/(R1+R2)
     
     @staticmethod
@@ -196,6 +202,10 @@ class ee:
             print('%s = %3.0f uF' %(name, val/1E+6))
         if val <= 1E+6:
             print('%s = %3.0f fF' %(name, val))
+            
+    @staticmethod
+    def print_F(name, val):
+        print('%s = %3.2f MHz' %(name, val*1E-6))
             
     @staticmethod
     def print_V(name, val):
@@ -236,14 +246,21 @@ class CG(mosfet):
         ee.print_C('   Cout', self.Cout)
         
     def _set(self, Vov, Id, RL):
-        self.RL    = RL
-        self.M1.set_params(Vov, Id)
-        self.Rin  = 1/self.M1.gmp
-        self.Rout = ee.parallel(2*self.M1.ro, self.RL)
-        self.Cin  = self.M1.cgs + self.M1.csb
-        self.Cout = self.M1.cgd + self.M1.cdb
-        self.TI   = self.Rout
+        try:
+            self.RL    = RL
+            self.M1.set_params(Vov, Id)
+            self.Rin  = 1/self.M1.gmp
+            self.Rout = ee.parallel(2*self.M1.ro, self.RL)
+            self.Cin  = self.M1.cgs + self.M1.csb
+            self.Cout = self.M1.cgd + self.M1.cdb
+            self.TI   = self.Rout
+            return 0
+        except:
+            print('out of bounds set to CG mosfet')
+            
         
+    def get_TI(self):
+        return self.TI
     def get_Rin(self):
         return self.Rin
     def get_Rout(self):
@@ -252,8 +269,6 @@ class CG(mosfet):
         return self.Cin
     def get_Cout(self):
         return self.Cout
-    def get_TI(self):
-        return self.TI
         
     
 def unit_test_CG():
@@ -267,8 +282,8 @@ unit_test_CG()
 
 #%% CG_lookup.  abstract CG stage to lookup3(Vov, Id, RL)
 class CG_LK(CG):
-    _Vov = np.linspace(0.15, 0.3,  5)
-    _Id  = np.linspace(5E-6, 5E-5, 5)
+    _Vov = np.linspace(0.15, 0.4,  5)
+    _Id  = np.linspace(1E-5, 5E-5, 5)
     _RL  = np.linspace(1E+4, 4E+4, 5)
 #    print(f'_Vov: {_Vov}')
 #    print(f'_Id:  {_Id}')
@@ -324,7 +339,8 @@ class CG_LK(CG):
             
                 
     def get_TI(self, Vov, Id, RL):
-        return self.check_input(Vov, Id, RL)
+        self.check_input(Vov, Id, RL)
+        return self.TI_f([Vov, Id, RL])
     def get_Rin(self, Vov, Id, RL):
         self.check_input(Vov, Id, RL)
         return self.Rin_f([Vov, Id, RL])
@@ -406,7 +422,7 @@ unit_test_CS()
 
 #%%
 class CS_LK(CS):
-    _Vov = np.linspace(0.15, 0.3,  5)
+    _Vov = np.linspace(0.2, 0.4,  5)
     _Id  = np.linspace(1E-5, 1E-4, 5)
     _A1  = np.linspace(1, 5, 5)
 #    print(f'_Vov: {_Vov}')
@@ -540,7 +556,7 @@ unit_test_CD()
 
 #%%
 class CD_LK(CD):
-    _Vov = np.linspace(0.15, 0.3,  5)
+    _Vov = np.linspace(0.15, 0.4,  5)
     _Id  = np.linspace(1E-5, 1E-4, 5)
 #    print(f'_Vov: {_Vov}')
 #    print(f'_Id:  {_Id}')
@@ -572,13 +588,16 @@ class CD_LK(CD):
     def check_input(self, Vov, Id):
         if Vov < self._Vov[0]:
             print('Vov_3 under range')
+            return -1
         if Vov > self._Vov[-1]:
             print('Vov_3 over range')
-            
+            return -1
         if Id < self._Id[0]:
             print('Id_3 under range')
+            return -1
         if Id > self._Id[-1]:
             print('Id_3 over range')
+            return -1
             
     def get_A2(self, Vov, Id):
         self.check_input(Vov, Id)
@@ -612,7 +631,7 @@ CD_LK_unit_test()
 class PCM():
     I_ref = 1E-5
     Vsup   = 5.
-    p_total = 1.5E-3
+    p_total = 1.8E-3
     p_I_ref = I_ref*Vsup
     
     def __init__(self):
@@ -648,8 +667,8 @@ class PCM():
     def _set(self, R_LCG, V1, ratio_1, ratio_2):
         self.R_LCG   = R_LCG
         self.V1      = V1
-        self.ratio_1 = ratio_1
-        self.ratio_2 = ratio_2
+        self.ratio_1 = ratio_1  # ratio Id_1 to Id_3
+        self.ratio_2 = ratio_2  # ratio Id_2 to total
         self._upd()
         
     def _upd(self):
@@ -662,7 +681,7 @@ class PCM():
         self.Id_1 = self.Id_half * (self.ratio_1*(1-self.ratio_2)) / (1+self.ratio_1)
         self.Id_2 = self.Id_half * self.ratio_2
         self.Id_3 = self.Id_half * (1-self.ratio_2) / (1+self.ratio_1)
-        self._print()
+#        self._print()
         
     def get_Id_1(self):
         return self.Id_1
