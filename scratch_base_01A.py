@@ -2,22 +2,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 import time
+#np.set_printoptions(precision=2)
+#np.set_printoptions(linewidth=1000)
+#np.set_printoptions(threshold=np.inf)
+#np.set_printoptions(suppress=False,
+#   formatter={'float_kind':'{:2.2f}'.format})
+
+np.set_printoptions(suppress=True,
+   formatter={'float_kind':'{:7.2f}'.format}, linewidth=130)
 
 #%% TIA
 
-class TIA(CG, CS, CD, PCM):
+class TIA(CG, CS, CD, PCM, CM):
     
     def __init__(self):
         self.cg = CG()
         self.cs = CS()
         self.cd = CD()
         self.pcm = PCM()
+        self.cm = CM()
         # inputs
         self.Vov_1 = -1
         self.Vov_2 = -1
         self.Vov_3 = -1
-        self.V_BN  = -1
-        self.V_BP  = -1
+        self.Vov_N = -1
+        self.Vov_P  = -1
         # stage parameters: mag, Rin, Rout, Cin, Cout
         self.CG_list = [-1, -1, -1, -1, -1]
         self.CS_list = [-1, -1, -1, -1, -1]
@@ -27,41 +36,13 @@ class TIA(CG, CS, CD, PCM):
         self.sys2_list = [-1, -1, -1]
         self.sys3_list = [-1, -1, -1]
         self.sys4_list = [-1, -1, -1]
-        # magnitudes
         self.M_list = [-1, -1, -1]
         # outputs
         self.power = -1
         self.gain  = -1
         self.f3dB_list = [-1, -1, -1, -1]
         self.FOM   = -1
-        
-    def _print_input(self):
-        print('-'*40)
-        print('TIA inputs:')
-        print('  Vov_1:   %3.3f V' %self.Vov_1)
-        print('  Vov_2:   %3.3f V' %self.Vov_2)
-        print('  Vov_3:   %3.3f V' %self.Vov_3)
-        
-        print('  V_BN:    %3.3f V' %self.V_BN)
-        print('  V_BP:    %3.3f V' %self.V_BP)
-        
-        print('  R_LCG:   %3.1f kohms' %(1E-3*self.pcm.R_LCG))
-        print('  V1:      %3.3f V'    %self.pcm.V1)
-        print('  ratio_1: %3.3f' %self.pcm.ratio_1)
-        print('  ratio_2: %3.3f' %self.pcm.ratio_2)
-        
-    def _print_mosfets(self):
-        print('-'*40)
-        self.cg.M1._print()
-        self.cg.M1L._print()
-        self.cg.M1B._print()
-        print()
-        self.cs.M2._print()
-        self.cs.M2L._print()
-        self.cs.M2B._print()
-        print()
-        self.cd.M3._print()
-        self.cd.M3B._print()
+        self.performance_list = []
     
     def _print_output(self):
         print('TIA outputs:')
@@ -113,36 +94,31 @@ class TIA(CG, CS, CD, PCM):
         ee.print_F('   p3', self.sys4_list[2])
         print('-'*40)
         
-    # _in = (Vov_1, Vov_2, Vov_3, V_BN, V_BP, R_LCG, V1, ratio_1, ratio_2)
+    # _in = (Vov_1, Vov_2, Vov_3, Vov_N, Vov_P, R_LCG, V1, ratio_1, ratio_2)
     def _set(self, _in):
-        # unpack _in to local variables
-        Vov_1 =   _in[0]
-        Vov_2 =   _in[1]
-        Vov_3 =   _in[2]
-        V_BN  =   _in[3]
-        V_BP  =   _in[4]
-        R_LCG =   _in[5]
-        V1    =   _in[6]
-        ratio_1 = _in[7]  # ratio_1: Id_1 to Id_3
-        ratio_2 = _in[8]  # ratio_2: Id_2 to total
-        # pcm calculates drain currents from power consumption constrains and 2 input params
-        self.pcm._set(R_LCG, V1, ratio_1, ratio_2)
+        # unpack _in
+        self.Vov_1       = _in[0]
+        self.Vov_2       = _in[1]
+        self.Vov_3       = _in[2]
+        self.Vov_N       = _in[3]
+        self.Vov_P       = _in[4]
+        self.pcm._set(_in[5], _in[6], _in[7], _in[8])
+        # _set(self, Vov_N, Vov_P, Id_mirror)
+        self.cm._set(self.Vov_N, self.Vov_P, 1E-5)
         
-        # cg._set(self, Vov_1, V_BN, V_BP, Id_1, R_LCG):
-        r1 = self.cg._set(Vov_1, V_BN, V_BP, self.pcm.get_Id_1(), R_LCG)
+        # cg._set(self, Vov_1, Vov_N, Vov_P, Id_1, R_LCG):
+        r1 = self.cg._set(self.Vov_1, self.Vov_N, self.Vov_P, self.pcm.get_Id_1(), self.pcm.get_R_LCG())
         self.CG_list = [self.cg.get_TI(), self.cg.get_Rin(), self.cg.get_Rout(), self.cg.get_Cin(), self.cg.get_Cout()]   
-        
-        # cd._set(self, Vov_3, V_BN, Id_3):
-        r3 = self.cd._set(Vov_3, V_BN, self.pcm.get_Id_3())
+        # cd._set(self, Vov_3, Vov_N, Id_3):
+        r3 = self.cd._set(self.Vov_3, self.Vov_N, self.pcm.get_Id_3())
         self.CD_list = [-self.cd.get_A2(), self.cd.get_Rin(), self.cd.get_Rout(), self.cd.get_Cin(), self.cd.get_Cout()]
-        
-        print(f'CG_mag: {self.CG_list[0]}')
-        print(f'CD_mag: {self.CD_list[0]}')
+#        print(f'CG_mag: {self.CG_list[0]}')
+#        print(f'CD_mag: {self.CD_list[0]}')
         A1 = 40000 / (self.CG_list[0]*self.CD_list[0])
 #        print(f'A1: {A1}')
-        # cs._set(self, Vov_2, V_BN, Id_2, A1):
-        r2 = self.cs._set(Vov_2, V_BN, self.pcm.get_Id_2(), A1)
-        self.CS_list = [A1, self.cs.get_Rin(), self.cs.get_Rout(), self.cs.get_Cin(), self.cs.get_Cout()]
+        # cs._set(self, Vov_2, Vov_N, Id_2, A1):
+        r2 = self.cs._set(self.Vov_2, self.Vov_N, self.pcm.get_Id_2(), A1)
+        self.CS_list = [-A1, self.cs.get_Rin(), self.cs.get_Rout(), self.cs.get_Cin(), self.cs.get_Cout()]
         
         # stage parameters: 0:mag, 1:Rin, 2:Rout, 3:Cin, 4:Cout
         self.M_list = [self.CG_list[0], self.CS_list[0], self.CD_list[0]]
@@ -193,34 +169,135 @@ class TIA(CG, CS, CD, PCM):
             mag_H2[i] = mag1[i]*mag2[i]
             mag_H3[i] = mag1[i]*mag2[i]*mag3[i]
             mag_H4[i] = mag1[i]*mag2[i]*mag3[i]*mag4[i]
-            try:
-                mag1_f  = interpolate.interp1d(mag_H1,  _freq)
-                mag2_f = interpolate.interp1d(mag_H2, _freq)
-                mag3_f = interpolate.interp1d(mag_H3, _freq)
-                mag4_f = interpolate.interp1d(mag_H4, _freq)
-                self.f3dB_list[0] = mag1_f(0.71)
-                self.f3dB_list[1] = mag2_f(0.71)
-                self.f3dB_list[2] = mag3_f(0.71)
-                self.f3dB_list[3] = mag4_f(0.71)
-#                print('freq: %3.3f,   mag: %3.3f' %(1E-6*_freq[i], mag[i]))
-            except:
-                print('no cutoff freq found')
-                return -2
-#        print('f3dB_0: %3.3f MHz' %(1E-6*self.f3dB_0))
-#        print('f3dB_1: %3.3f MHz' %(1E-6*self.f3dB_1))
-#        print('f3dB_2: %3.3f MHz' %(1E-6*self.f3dB_2))
-#        print('f3dB_3: %3.3f MHz' %(1E-6*self.f3dB_3))
-#        print('f3dB:   %3.3f MHz' %(1E-6*self.f3dB))
+        
+        try:
+            mag1_f = interpolate.interp1d(mag_H1,  _freq)
+            mag2_f = interpolate.interp1d(mag_H2, _freq)
+            mag3_f = interpolate.interp1d(mag_H3, _freq)
+            mag4_f = interpolate.interp1d(mag_H4, _freq)
+            self.f3dB_list[0] = mag1_f(0.71)
+            self.f3dB_list[1] = mag2_f(0.71)
+            self.f3dB_list[2] = mag3_f(0.71)
+            self.f3dB_list[3] = mag4_f(0.71)
+#            print('f3dB1: %3.3f MHz' %(1E-6*self.f3dB_list[0]))
+#            print('f3dB2: %3.3f MHz' %(1E-6*self.f3dB_list[1]))
+#            print('f3dB3: %3.3f MHz' %(1E-6*self.f3dB_list[2]))
+#            print('f3dB4: %3.3f MHz' %(1E-6*self.f3dB_list[3]))
+
+        except:
+            print('no cutoff freq found')
+            return -2
         self.FOM = 40*(1E-6*self.f3dB_list[3])/2
         return 0
+    
+    def _print_input(self):
+        inputs = self._get_input()
+        print('              Vov_1   Vov_2   Vov_3   Vov_N   Vov_P   R_LCG    V1   ratio_1 ratio_2')
+        print(f'tia input: {inputs}')
+    
+    def _get_input(self):        
+        Vov_1 = np.round(self.Vov_1, 3)
+        Vov_2 = np.round(self.Vov_2, 3)
+        Vov_3 = np.round(self.Vov_3, 3)
+        Vov_N = np.round(self.Vov_N, 3)
+        Vov_P = np.round(self.Vov_P, 3)
+        R_LCG   = np.round(self.pcm.R_LCG/1000, 1)
+        V1      = np.round(self.pcm.V1, 3)
+        ratio_1 = np.round(self.pcm.ratio_1, 3)
+        ratio_2 = np.round(self.pcm.ratio_2, 3)
+    
+        return_array = np.array((Vov_1, Vov_2, Vov_3, Vov_N, Vov_P, R_LCG, V1, ratio_1, ratio_2))
+        return return_array
+    
+    def _print_performance(self):
+        performance = self._get_performance()
+        print('                FOM   f3dB1   f3dB2   f3dB3   f3dB4 [MHz]')
+        print(f'tia perfm: {performance}')
+    
+    def _get_performance(self):        
+        FOM   = np.round(self.FOM, 0)
+        f3dB1 = np.round(self.f3dB_list[0]/1E+6, 2)
+        f3dB2 = np.round(self.f3dB_list[1]/1E+6, 2)
+        f3dB3 = np.round(self.f3dB_list[2]/1E+6, 2)
+        f3dB4 = np.round(self.f3dB_list[3]/1E+6, 2)
+        return_array = np.array((FOM, f3dB1, f3dB2, f3dB3, f3dB4))
+        return return_array
+    
+    def _print_mosfets(self):
+        mosfets = self._get_mosfets()
+        
+        labels_list = ['Vov [V]   ', 
+                       'Id [uA]   ', 
+                       'type      ', 
+                       'WL        ', 
+                       'W [um]    ', 
+                       'L[um]     ', 
+                       'gm [mA/V] ', 
+                       'gmp [mA/V]', 
+                       'ro [kohms]', 
+                       'cgs [fF]  ', 
+                       'cgd [fF]  ', 
+                       'csb [fF]  ', 
+                       'cdb [fF]  ']
+        
+        print('mosfets:      M1L     M1      M1B     M2L     M2      M2B     M3      M3B     Mi1     Mi2     Mi3')
+        for i in range(13):
+            print(f'{labels_list[i]} {mosfets[i,:]}')
+    
+    def _get_mosfets(self):
+        M1L = self.cg.M1L._get()
+        M1  = self.cg.M1._get()
+        M1B = self.cg.M1B._get()
+        
+        M2L = self.cs.M2L._get()
+        M2  = self.cs.M2._get()
+        M2B = self.cs.M2B._get()
+        
+        M3  = self.cd.M3._get()
+        M3B = self.cd.M3B._get()
+        
+        Mi1 = self.cm.Mi1._get()
+        Mi2 = self.cm.Mi2._get()
+        Mi3 = self.cm.Mi3._get()  
+        
+        mosfets = np.zeros((13, 11))
+        for i in range(13):
+            mosfets[i, 0] = M1L[i]
+            mosfets[i, 1] = M1 [i]
+            mosfets[i, 2] = M1B[i]
+            
+            mosfets[i, 3] = M2L[i]
+            mosfets[i, 4] = M2 [i]
+            mosfets[i, 5] = M2B[i]
+            
+            mosfets[i, 6] = M3 [i]
+            mosfets[i, 7] = M3B[i]
+            
+            mosfets[i, 8 ] = Mi1[i]
+            mosfets[i, 9 ] = Mi2[i]
+            mosfets[i, 10] = Mi3[i]
+        return mosfets
+   
     
 p = 0     
 def TIA_unit_test():
     tia = TIA()
-    # _in = (Vov_1, Vov_2, Vov_3, V_BN, V_BP, R_LCG, V1, ratio_1, ratio_2)
+    # _in = (Vov_1, Vov_2, Vov_3, Vov_N, Vov_P, R_LCG, V1, ratio_1, ratio_2)
     _in = [0.2, 0.2, 0.2, 0.5, 0.5, 2E+4, 0, 1, 0.2]
     r = tia._set(_in)
+    print('-'*100)
     print(f'tia ret: {r}')
+    tia._print_input()
+    print()
+    tia._print_performance()
+    print()
+    tia._print_mosfets()
+    print()
+    print('-'*100)
+    
+#    performance_results = tia._get()
+#    print(f'performance_results: {performance_results}')
+    
 #    if p == 0:
 #        tia._print_input()
 #        tia._print_stage_params()
@@ -229,7 +306,7 @@ def TIA_unit_test():
 #        print('invalid input into TIA._set')
 
 
-#TIA_unit_test()
+TIA_unit_test()
 
 
 
@@ -237,62 +314,59 @@ def TIA_unit_test():
 
 class SWEEP(TIA):
     
-    _Vov_1     = np.linspace(0.3, 0.4, 1)
-    _Vov_2     = np.linspace(0.2, 0.4, 1)
-    _Vov_3     = np.linspace(0.3, 0.4, 1)
-    _V_BN      = np.linspace(0.3, 0.5, 1)
-    _V_BP      = np.linspace(0.3, 0.5, 1)
-    _R_LCG     = np.linspace(2E+4,2E+4,1)
-    _V1        = np.linspace(-0.2, 0.2, 1)
-    _I_ratio_1 = np.linspace(0.7, 1.4, 1)  # ratio_1:  Id_1 to Id_3
-    _I_ratio_2 = np.linspace(0.2, 0.3, 1)  # ratio_2:  Id_2 to total
+    _Vov_1   = np.linspace(0.3, 0.4, 1)
+    _Vov_2   = np.linspace(0.2, 0.4, 1)
+    _Vov_3   = np.linspace(0.3, 0.4, 1)
+    _Vov_N   = np.linspace(0.3, 0.5, 1)
+    _Vov_P   = np.linspace(0.3, 0.5, 1)
+    _R_LCG   = np.linspace(2E+4,2E+4,1)
+    _V1      = np.linspace(-0.2, 0.2, 1)
+    _ratio_1 = np.linspace(0.7, 1.4, 1)  # ratio_1:  Id_1 to Id_3
+    _ratio_2 = np.linspace(0.2, 0.3, 1)  # ratio_2:  Id_2 to total
     
-    _FOM_Vov_1 = np.zeros(_Vov_1.shape[0])
-    _FOM_Vov_2 = np.zeros(_Vov_2.shape[0])
-    _FOM_Vov_3 = np.zeros(_Vov_3.shape[0])
-    _FOM_V_BN  = np.zeros(_V_BN.shape[0])
-    _FOM_V_BP  = np.zeros(_V_BP.shape[0])
-    _FOM_R_LCG = np.zeros(_R_LCG.shape[0])
-    _FOM_V1    = np.zeros(_V1.shape[0])
-    _FOM_I_ratio_1 = np.zeros(_I_ratio_1.shape[0])
-    _FOM_I_ratio_2 = np.zeros(_I_ratio_2.shape[0])
+    _FOM_Vov_1   = np.zeros(_Vov_1.shape[0])
+    _FOM_Vov_2   = np.zeros(_Vov_2.shape[0])
+    _FOM_Vov_3   = np.zeros(_Vov_3.shape[0])
+    _FOM_Vov_N   = np.zeros(_Vov_N.shape[0])
+    _FOM_Vov_P   = np.zeros(_Vov_P.shape[0])
+    _FOM_R_LCG   = np.zeros(_R_LCG.shape[0])
+    _FOM_V1      = np.zeros(_V1.shape[0])
+    _FOM_ratio_1 = np.zeros(_ratio_1.shape[0])
+    _FOM_ratio_2 = np.zeros(_ratio_2.shape[0])
     
    
     def __init__(self):
         self.tia = TIA()
-        self.valid_point_list = []
+        self.valid_point_list   = []
         self.invalid_point_list = []
-        self.results_list     = []
-        self.top_results_list = []
+        self.results_list       = []
+        self.top_results_list   = []
         print('initializing sweep')
-#        self._print_input()
         
-        # performance
-        self.FOM   = -1
-        self.FOM   = -1
-        self.f3dB1 = -1
-        self.f3dB2 = -1
-        self.f3dB3 = -1
-        self.f3dB4 = -1
-        
-        # inputs
+        # inputs:
         self.Vov_1 = -1
         self.Vov_2 = -1
         self.Vov_3 = -1
-        self.V_BN  = -1
-        self.V_BP  = -1
-        self.R_LC  = -1
+        self.Vov_N = -1
+        self.Vov_P = -1
+        self.R_LCG = -1
         self.V1    = -1
         self.ratio_1 = -1
         self.ratio_2 = -1
+        self.inputs = []
         
-        # outputs
-        self.M1_W  = -1
+        # performance:
+        self.FOM   = -1
+        self.f3dB  = [-1, -1, -1, -1]
+        self.performance = []
+        
+        # Hspice outputs:
         self.M1L_W = -1
+        self.M1_W  = -1
         self.M1B_W = -1
         
-        self.M2_W  = -1
         self.M2L_W = -1
+        self.M2_W  = -1
         self.M2B_W = -1
         
         self.M3_W  = -1
@@ -304,55 +378,51 @@ class SWEEP(TIA):
         self.Id_1  = -1
         self.Id_2  = -1
         self.Id_3  = -1
-        
-        self.results = np.zeros((28))
-        print(f'results: {self.results}')
-    
+        self.Hspice_outputs = []
+       
     def _print_input_vectors(self):
         print('-'*40)
         print('Input Vectors')
-        print(f'  _Vov_1:     {self._Vov_1}')
-        print(f'  _Vov_2:     {self._Vov_2}')
-        print(f'  _Vov_3:     {self._Vov_3}')
-        print(f'  _V_BN:      {self._V_BN}')
-        print(f'  _V_BP:      {self._V_BP}')
-        print(f'  _R_LCG:     {self._R_LCG}')
-        print(f'  _V1:        {self._V1}')
-        print(f'  _I_ratio_1: {self._I_ratio_1}')
-        print(f'  _I_ratio_2: {self._I_ratio_2}')
+        print(f'  _Vov_1:   {self._Vov_1}')
+        print(f'  _Vov_2:   {self._Vov_2}')
+        print(f'  _Vov_3:   {self._Vov_3}')
+        print(f'  _Vov_N:   {self._Vov_N}')
+        print(f'  _Vov_P:   {self._Vov_P}')
+        print(f'  _R_LCG:   {self._R_LCG}')
+        print(f'  _V1:      {self._V1}')
+        print(f'  _ratio_1: {self._ratio_1}')
+        print(f'  _ratio_2: {self._ratio_2}')
         print('-'*40)
         
     def _set(self, i1, i2, i3, i4, i5, i6, i7, i8, i9):
         # inputs
-        self.Vov_1    = self._Vov_1    [i1] # 6
-        self.Vov_2    = self._Vov_2    [i2] # 7
-        self.Vov_3    = self._Vov_3    [i3] # 8
-        self.V_BN     = self._V_BN     [i4] # 5
-        self.V_BP     = self._V_BP     [i5] # 9
-        self.R_LCG    = self._R_LCG    [i6] # 10
-        self.V1       = self._V1       [i7] # 11
-        self.I_ratio_1= self._I_ratio_1[i8] # 12
-        self.I_ratio_2= self._I_ratio_2[i9] # 13
+        self.Vov_1    = self._Vov_1  [i1] # 6
+        self.Vov_2    = self._Vov_2  [i2] # 7
+        self.Vov_3    = self._Vov_3  [i3] # 8
+        self.Vov_N    = self._Vov_N  [i4] # 5
+        self.Vov_P    = self._Vov_P  [i5] # 9
+        self.R_LCG    = self._R_LCG  [i6] # 10
+        self.V1       = self._V1     [i7] # 11
+        self.ratio_1  = self._ratio_1[i8] # 12
+        self.ratio_2  = self._ratio_2[i9] # 13
         
-        _in = (self._Vov_1    [i1],
-               self._Vov_2    [i2],
-               self._Vov_3    [i3],
-               self._V_BN     [i4],
-               self._V_BP     [i5],
-               self._R_LCG    [i6],
-               self._V1       [i7],
-               self._I_ratio_1[i8],
-               self._I_ratio_2[i9]
-               ) 
-#        print(f'_in: {_in}')
+        _in = [self.Vov_1,
+               self.Vov_2,
+               self.Vov_3,
+               self.Vov_N,
+               self.Vov_P,
+               self.R_LCG,
+               self.V1,
+               self.ratio_1,
+               self.ratio_2] 
+        
+        print(f'_in: {_in}')
         tia_ret = self.tia._set(_in)
         print(f'tia_ret: {tia_ret}')
+        
         if tia_ret == 0:
-            self.FOM   = self.tia.FOM          # 0
-            self.f3dB1 = self.tia.f3dB_list[0] # 1
-            self.f3dB2 = self.tia.f3dB_list[1] # 2
-            self.f3dB3 = self.tia.f3dB_list[2] # 3
-            self.f3dB4 = self.tia.f3dB_list[3] # 4
+            self.FOM  = self.tia.FOM          
+            self.f3dB = self.tia.f3dB_list 
             
             self.M1_W  = self.tia.cg.M1.W      # 14
             self.M1L_W = self.tia.cg.M1L.W     # 15
@@ -370,43 +440,7 @@ class SWEEP(TIA):
         
             self.Id_1  = self.tia.cg.Id_1      # 24
             self.Id_2  = self.tia.cs.Id_2      # 25
-            self.Id_3  = self.tia.cd.Id_3      # 26
-            
-            # set
-            self.results[0 ] = self.FOM        # 0
-            self.results[1 ] = self.f3dB1      # 1
-            self.results[2 ] = self.f3dB2      # 2
-            self.results[3 ] = self.f3dB3      # 3
-            self.results[4 ] = self.f3dB4      # 4
-        
-            self.results[6 ] = self.Vov_1      # 6
-            self.results[7 ] = self.Vov_2      # 7
-            self.results[8 ] = self.Vov_3      # 8
-            self.results[9 ] = self.V_BN       # 9
-            self.results[10] = self.V_BP       # 10
-            self.results[11] = self.R_LCG      # 11
-            self.results[12] = self.V1         # 12
-            self.results[13] = self.tia.pcm.ratio_1 # 13
-            self.results[14] = self.tia.pcm.ratio_2 # 14
-            
-            self.results[15] = self.M1L_W      # 15
-            self.results[16] = self.M1_W       # 16
-            self.results[17] = self.M1B_W      # 17
-            
-            self.results[18] = self.M2L_W      # 18
-            self.results[19] = self.M2_W       # 19
-            self.results[20] = self.M2B_W      # 20
-            
-            self.results[21] = self.M3_W       # 21
-            self.results[22] = self.M3B_W      # 22
-        
-            self.results[23] = self.Ru         # 23
-            self.results[24] = self.Rd         # 24
-            
-            self.results[25] = self.Id_1       # 25
-            self.results[26] = self.Id_2       # 26
-            self.results[27] = self.Id_3       # 27
-            
+            self.Id_3  = self.tia.cd.Id_3      # 26     
             return 0
         return -1
         
@@ -422,8 +456,8 @@ class SWEEP(TIA):
         print('  Vov_1:   %3.2f V'     %(1E-0*self.results[6 ]))
         print('  Vov_2:   %3.2f V'     %(1E-0*self.results[7 ]))
         print('  Vov_3:   %3.2f V'     %(1E-0*self.results[8 ]))
-        print('  V_BN:    %3.2f V'     %(1E-0*self.results[9 ]))
-        print('  V_BP:    %3.2f V'     %(1E-0*self.results[10]))
+        print('  Vov_N:   %3.2f V'     %(1E-0*self.results[9 ]))
+        print('  Vov_P:   %3.2f V'     %(1E-0*self.results[10]))
         print('  R_LCG:   %3.2f kohms' %(1E-3*self.results[11]))
         print('  V1:      %3.2f V'     %(1E-0*self.results[12]))
         print('  ratio_1: %3.2f'       %(1E-0*self.results[13]))
@@ -448,6 +482,41 @@ class SWEEP(TIA):
         print('  Id_3:  %3.1f uA'      %(1E+6*self.results[27]))
         print('-'*40)
         
+    def _get_inputs(self):
+        self.inputs = []
+        self.inputs = [self.Vov_1,
+                       self.Vov_2,
+                       self.Vov_3,
+                       self.Vov_N,
+                       self.Vov_P,
+                       self.R_LCG,
+                       self.ratio_1,
+                       self.ratio_2]
+        
+        return self.inputs
+    
+    def _get_performance(self):
+        self.performance = []
+        self.performance = [self.FOM, self.f3dB[0], self.f3dB[1], self.f3dB[2], self.f3dB[3]]
+        
+        return self.performance
+    
+    def _get_Hspice_outputs(self):
+        self.Hspice_outputs = []
+        self.Hspice_outputs = [self.M1L_W,
+                               self.M1_W,
+                               self.M1B_W,
+                               self.M2L_W,
+                               self.M2_W,
+                               self.M2B_W,
+                               self.M3_W,
+                               self.M3B_W,
+                               self.Ru,
+                               self.Rd]
+        
+        return self.Hspice_outputs
+    
+        
     def iterate(self):
         start_ms = int(round(time.time() * 1000))
         count = -1
@@ -458,13 +527,13 @@ class SWEEP(TIA):
             for i2 in range(self._Vov_2.shape[0]):
                 for i3 in range(self._Vov_3.shape[0]):
                     
-                    for i4 in range(self._V_BN.shape[0]):
-                        for i5 in range(self._V_BP.shape[0]):
+                    for i4 in range(self._Vov_N.shape[0]):
+                        for i5 in range(self._Vov_P.shape[0]):
                     
                             for i6 in range(self._R_LCG.shape[0]):
                                 for i7 in range(self._V1.shape[0]):
-                                    for i8 in range(self._I_ratio_1.shape[0]):
-                                        for i9 in range(self._I_ratio_2.shape[0]):
+                                    for i8 in range(self._ratio_1.shape[0]):
+                                        for i9 in range(self._ratio_2.shape[0]):
                                             count+=1
                                             print('*'*50)
                                             set_ret = self._set(i1, i2, i3, i4, i5, i6, i7, i8, i9)
@@ -481,10 +550,10 @@ class SWEEP(TIA):
                                                 if self.tia.FOM > self._FOM_Vov_3[i3]:
                                                     self._FOM_Vov_3[i3] = self.tia.FOM   
                                                 
-                                                if self.tia.FOM > self._FOM_V_BN[i4]:
-                                                    self._FOM_V_BN[i4] = self.tia.FOM
-                                                if self.tia.FOM > self._FOM_V_BP[i5]:
-                                                    self._FOM_V_BP[i5] = self.tia.FOM
+                                                if self.tia.FOM > self._FOM_Vov_N[i4]:
+                                                    self._FOM_Vov_N[i4] = self.tia.FOM
+                                                if self.tia.FOM > self._FOM_Vov_P[i5]:
+                                                    self._FOM_Vov_P[i5] = self.tia.FOM
                                                 
                                                 if self.tia.FOM > self._FOM_R_LCG[i4]:
                                                     self._FOM_R_LCG[i4] = self.tia.FOM
@@ -584,7 +653,7 @@ def SWEEP_unit_test():
     sweep.iterate()
     sweep._plot()
 
-SWEEP_unit_test()
+#SWEEP_unit_test()
 
 
 

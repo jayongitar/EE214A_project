@@ -101,8 +101,8 @@ class mosfet:
         self.type_dict = {0:'nmos l=1u', 1:'nmos l=2u', 2:'pmos l=1u', 3:'pmos l=2u',}
         # derived variables
         self.WL  = -1   
-        self.L   = -1 # um
         self.W   = -1 # um
+        self.L   = -1 # um
         self.gm  = -1 # A/V
         self.gmp = -1 # gm + gmb = 1.2*gm
         self.ro  = -1
@@ -188,7 +188,25 @@ class mosfet:
                 self.cdb = self.coef_p2[3, 0]*self.W + self.coef_p2[3, 1]
         except:
             print('error in mosfet.upd_caps()')
-    
+            
+    def _get_W(self):
+        return self.W
+    def _get_L(self):
+        return self.L
+    def _get(self):
+        return [np.round(1E+0*self.Vov, 2), 
+                np.round(1E+6*self.Id,  0), 
+                np.round(1E+0*self.type,0), 
+                np.round(1E+0*self.WL,  1), 
+                np.round(1E+0*self.W,   1), 
+                np.round(1E+0*self.L,   1), 
+                np.round(1E+3*self.gm,  1), 
+                np.round(1E+3*self.gmp, 1), 
+                np.round(1E-3*self.ro,  0), 
+                np.round(1E+0*self.cgs, 1), 
+                np.round(1E+0*self.cgd, 1), 
+                np.round(1E+0*self.csb, 1), 
+                np.round(1E+0*self.cdb, 1)]
         
 def unit_test_mosfet(test_type):
     nmos_1 = mosfet(0, 0)  # (type, debug)
@@ -200,7 +218,7 @@ def unit_test_mosfet(test_type):
 #%% CG
 class CG():
     def __init__(self):
-        print_mosfet = 1
+        print_mosfet = 0
         self.M1   = mosfet('M1',  0, print_mosfet)
         self.M1L  = mosfet('M1L', 3, print_mosfet)
         self.M1B  = mosfet('M1B', 1, print_mosfet)
@@ -221,12 +239,12 @@ class CG():
         ee.print_C('   Cin ', self.Cin)
         ee.print_C('   Cout', self.Cout)
         
-    def _set(self, Vov_1, V_BN, V_BP, Id_1, R_LCG):
+    def _set(self, Vov_1, Vov_N, Vov_P, Id_1, R_LCG):
         self.Id_1 = Id_1
         self.R_LCG = R_LCG
         r1 = self.M1._set (Vov_1, Id_1)
-        r2 = self.M1L._set(V_BP,  Id_1)
-        r3 = self.M1B._set(V_BN,  Id_1)
+        r2 = self.M1L._set(Vov_P,  Id_1)
+        r3 = self.M1B._set(Vov_N,  Id_1)
         if r1 == -1 or r2 == -1 or r3 == -1:
             print('failed to set a mosfet parameters in CG.')
             return -1  
@@ -282,11 +300,11 @@ class CS(mosfet):
         ee.print_C('   Cin ', self.Cin)
         ee.print_C('   Cout', self.Cout)
         
-    def _set(self, Vov_2, V_BN, Id_2, A1):  # A = -gain
+    def _set(self, Vov_2, Vov_N, Id_2, A1):  # A = -gain
         self.Id_2 = Id_2
         self.A1 = A1
         r1 = self.M2._set(Vov_2, Id_2)
-        r2 = self.M2B._set(V_BN, Id_2)
+        r2 = self.M2B._set(Vov_N, Id_2)
         r3 = self.M2L._set(1.2*Vov_2*A1, Id_2)
         if r1 == -1 or r2 == -1 or r3 == -1:
             return -1       
@@ -344,10 +362,10 @@ class CD(mosfet):
         ee.print_C('    Cin ', self.Cin)
         ee.print_C('    Cout', self.Cout)
         
-    def _set(self, Vov_3, V_BN, Id_3): 
+    def _set(self, Vov_3, Vov_N, Id_3): 
         self.Id_3 = Id_3
         r1 = self.M3._set(Vov_3, Id_3)
-        r2 = self.M3B._set(V_BN, Id_3)
+        r2 = self.M3B._set(Vov_N, Id_3)
         if r1 == -1 or r2 == -1:
             return -1  
         
@@ -378,7 +396,7 @@ def unit_test_CD():
     cd._print()
     print('')
 
-unit_test_CD()
+#unit_test_CD()
 
 #%% Power Control Module
 class PCM():
@@ -435,7 +453,15 @@ class PCM():
         self.Id_2 = self.Id_half * self.ratio_2
         self.Id_3 = self.Id_half * (1-self.ratio_2) / (1+self.ratio_1)
 #        self._print()
-        
+    
+    def get_R_LCG(self):
+        return self.R_LCG
+    def get_V1(self):
+        return self.V1
+    def get_ratio_1(self):
+        return self.ratio_1
+    def get_ratio_2(self):
+        return self.ratio_2
     def get_Id_1(self):
         return self.Id_1
     def get_Id_2(self):
@@ -448,3 +474,60 @@ def PCM_unit_test():
     pcm._set(1.5E+4, 0, 1, 0.2)
     
 #PCM_unit_test()
+
+#%% Current Mirror
+class CM:
+    def __init__(self):
+        print_mosfet = 0
+        self.Mi1 = mosfet('Mi1', 1, print_mosfet)
+        self.Mi2 = mosfet('Mi2', 1, print_mosfet)
+        self.Mi3 = mosfet('Mi2', 3, print_mosfet)
+        self.Vov_N     = -1
+        self.Vov_P     = -1
+        self.Id_mirror = -1
+        self.mirror_results = []
+        
+    def _set(self, Vov_N, Vov_P, Id_mirror):
+        self.mirror_results = []
+#        try:
+        self.Vov_N     = Vov_N
+        self.Vov_P     = Vov_P
+        self.Id_mirror = Id_mirror
+        
+        # calculate Mi1, Mi2, Mi3 sizing
+        self.Mi1._set(self.Vov_N, Id_mirror)
+        self.Mi2._set(self.Vov_N, Id_mirror)
+        self.Mi3._set(self.Vov_P, Id_mirror)
+        
+        self.mirror_results.append([self.Mi1._get_W(), self.Mi1._get_L()])
+        self.mirror_results.append([self.Mi2._get_W(), self.Mi2._get_L()])
+        self.mirror_results.append([self.Mi3._get_W(), self.Mi3._get_L()])
+
+    def _print(self):
+        print(f'CM._print() {self.mirror_results}')
+        
+    def _get(self):
+        return self.mirror_results
+    
+        
+def CM_unit_test():
+    cm = CM()
+    cm._set(0.5, 0.5, 1E-5)
+    cm._print()
+    results = cm._get()
+    print(f'results: {results}')
+    
+
+CM_unit_test()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
