@@ -150,8 +150,9 @@ class mosfet:
             self.W  = self.WL*(self.type-1)
             self.L  = self.type-1
         # check WL limits
-        if self.WL < 2 or self.WL > 1000:
-            print(f'_mosfet: out of range parameter: \n   Vov = {self.Vov} \n   Id = {self.Id} \n   WL={self.WL}')
+        if self.W < 2 or self.W > 1000:
+            print(f'mosfet {self.name}: out of range parameter: \n   Vov = {self.Vov} \n   Id = {self.Id} \n   WL={self.WL}')
+            return -1
             
         # gm = 2*Id/Vov
         self.gm = 2*self.Id/self.Vov
@@ -160,6 +161,7 @@ class mosfet:
         self.upd_caps()
         if self.debug:
             self._print_all()
+        return 0
             
     def upd_caps(self):
 #        print(self.coef_n1.shape)
@@ -190,12 +192,13 @@ class CG():
         self.M1   = mosfet('M1',  0, print_mosfet)
         self.M1L  = mosfet('M1L', 1, print_mosfet)
         self.M1B  = mosfet('M1B', 1, print_mosfet)
-        self.RL   = -1
+        self.R_LCG= -1
         self.TI   = -1
         self.Rin  = -1
         self.Cin  = -1
         self.Rout = -1
         self.Cout = -1
+        self.C_IN = 100
         
     def _print(self):
         print('CG stage parameters:')
@@ -205,22 +208,23 @@ class CG():
         ee.print_C('   Cin ', self.Cin)
         ee.print_C('   Cout', self.Cout)
         
-    def _set(self, Vov, Vov_L, Vov_B, Id, RL):
-        ee.print_R('RL', RL)
-        self.RL    = RL
-        self.M1._set (Vov,   Id)
-        self.M1L._set(Vov_L, Id)
-        self.M1B._set(Vov_B, Id)
-#        print(f'ro: {self.M1.ro}, {self.M1L.ro}, {self.M1B.ro}')
-        self.Rin_approx = 1/self.M1.gmp
-        self.Cin_approx = self.M1.cgs + self.M1.csb
-        self.Cout_approx = self.M1.cgd + self.M1.cdb
-        
-        self.Rin  = (self.M1.ro + 2*self.RL) / (self.M1.gmp*(self.M1.ro + self.RL))
-        self.Rout = ee.parallel(2*self.M1.ro, self.RL)
-        self.Cin  = self.M1.cgs + self.M1.csb + self.M1B.cgd + self.M1B.cdb
+    def _set(self, Vov_1, V_BN, V_BP, Id_1, R_LCG):
+        self.R_LCG = R_LCG
+        r1 = self.M1._set (Vov_1, Id_1)
+        r2 = self.M1L._set(V_BP,  Id_1)
+        r3 = self.M1B._set(V_BN,  Id_1)
+        if r1 == -1 or r2 == -1 or r3 == -1:
+            print('failed to set a mosfet parameters in CG.')
+            return -1  
+#        self.Rin_approx = 1/self.M1.gmp
+#        self.Cin_approx = self.M1.cgs + self.M1.csb
+#        self.Cout_approx = self.M1.cgd + self.M1.cdb
+        self.Rin  = (self.M1.ro + 2*self.R_LCG) / (self.M1.gmp*(self.M1.ro + self.R_LCG))
+        self.Rout = ee.parallel(2*self.M1.ro, self.R_LCG)
+        self.Cin  = self.M1.cgs + self.M1.csb + self.M1B.cgd + self.M1B.cdb + self.C_IN
         self.Cout = self.M1.cgd + self.M1.cdb + self.M1L.cgd + self.M1L.cdb
         self.TI   = self.Rout
+        return 0
         
     def get_TI(self):
         return self.TI
@@ -236,15 +240,19 @@ class CG():
 def unit_test_CG():
     print('--- CG unit test --------------')
     cg = CG()
-    cg._set(0.2, 0.4, 0.4, 4E-5, 10000)
+    r = cg._set(0.2, 0.4, 0.4, 1E-5, 10000)
+#    print(f'r: {r}')
     cg._print()
 
-unit_test_CG()
+#unit_test_CG()
 
 #%% CS
 class CS(mosfet):
     def __init__(self):
-        self.M2   = mosfet(0, 0)
+        print_mosfet = 1
+        self.M2   = mosfet('M2',  0, print_mosfet)
+        self.M2L  = mosfet('ML2', 1, print_mosfet)
+        self.M2B  = mosfet('MB2', 1, print_mosfet)
         self.A1   = -1
         self.Rin  = -1
         self.Cin  = -1
@@ -259,16 +267,20 @@ class CS(mosfet):
         ee.print_C('   Cin ', self.Cin)
         ee.print_C('   Cout', self.Cout)
         
-    def _set(self, Vov, Id, A1):  # A = -gain
+    def _set(self, Vov_2, V_BN, Id_2, A1):  # A = -gain
         self.A1 = A1
-        self.M2.set_params(Vov, Id)
+        r1 = self.M2._set(Vov_2, Id_2)
+        r2 = self.M2B._set(V_BN, Id_2)
+        r3 = self.M2L._set(1.2*Vov_2*A1, Id_2)
+        if r1 == -1 or r2 == -1 or r3 == -1:
+            return -1       
         
         self.Rin  = 1E+21
-        self.Rout = ee.parallel(2*self.M2.ro, 1/(self.A1*self.M2.gmp))
-        self.Cin  = self.M2.cgs + self.M2.cgb + (1+self.A1)*self.M2.cgd
-        self.Cout = (1+1/self.A1)*self.M2.cgd + self.M2.cdb
-#        self._print()
-        
+        self.Rout = ee.parallel(0.5*self.M2.ro, 1/(self.M2L.gmp))
+        self.Cin  = self.M2.cgs + (1+self.A1)*self.M2.cgd
+        self.Cout = (1+1/self.A1)*self.M2.cgd + self.M2.cdb + self.M2L.csb + self.M2L.cgs
+        return 0
+    
     def get_Rin(self):
         return self.Rin
     def get_Rout(self):
@@ -283,7 +295,8 @@ class CS(mosfet):
 def unit_test_CS():
     print('--- CS_unit_test --------------------')
     cs = CS()
-    cs._set(0.2, 1E-4, 3)
+    r = cs._set(0.2, 0.5, 4E-5, 5)
+    print(f'r: {r}')
     cs._print()
     print()
 
@@ -293,28 +306,40 @@ def unit_test_CS():
 class CD(mosfet):
     
     def __init__(self):
-        self.M3   = mosfet(0, 0)
-        self.A2   = -0.84
+        self.M3   = mosfet('M3',  0, 1)
+        self.M3B  = mosfet('M3B', 1, 1)
+        self.A2   = -1
         self.Rin  = -1
         self.Cin  = -1
         self.Rout = -1
+        self.Rout_check = -1
         self.Cout = -1
+        self.R_OUT= 10000
+        self.C_OUT= 500
         
     def _print(self):
         print('CD stage parameters:')
         ee.print_A('    |A| ', 'V/V', -self.A2)
         ee.print_R('    Rin ', self.Rin)
         ee.print_R('    Rout', self.Rout)
+        ee.print_R('    Rout_check', self.Rout_check)
         ee.print_C('    Cin ', self.Cin)
         ee.print_C('    Cout', self.Cout)
         
-    def _set(self, Vov, Id): 
-        self.M3.set_params(Vov, Id)
+    def _set(self, Vov_3, V_BN, Id_3): 
+        r1 = self.M3._set(Vov_3, Id_3)
+        r2 = self.M3B._set(V_BN, Id_3)
+        if r1 == -1 or r2 == -1:
+            return -1  
+        
         self.Rin  = 1E+21
-        self.Rout = ee.parallel(2*self.M3.ro, 1/self.M3.gmp)
-        self.Cin  = self.M3.cgs + self.M3.cgb + (1+self.A2)*self.M3.cgd
-        self.Cout = (1+1/self.A2)*self.M3.cgd + self.M3.cdb
+        self.Rout = ee.parallel( 1 / self.M3.gmp, ee.parallel(0.5*self.M3.ro, self.R_OUT))
+        self.Rout_check= ee.parallel(1 / self.M3.gmp, self.R_OUT)
+        self.Cin  = self.M3.cgd + (1+self.A2)*self.M3.cgs
+        self.Cout = (1+1/self.A2)*self.M3.cgs + self.M3.csb + self.M3B.cgd + self.M3B.cdb + self.C_OUT
+        self.A2   = -self.M3.gm*self.Rout
 #        self._print()
+        return 0
     
     def get_A2(self):
         return self.A2
@@ -330,11 +355,11 @@ class CD(mosfet):
 def unit_test_CD():
     print('--- CD_unit_test ---------------------')
     cd = CD()
-    cd._set(0.2, 1E-4)
+    cd._set(0.2, 0.6, 1E-4)
     cd._print()
     print('')
 
-#unit_test_CD()
+unit_test_CD()
 
 #%% Power Control Module
 class PCM():
