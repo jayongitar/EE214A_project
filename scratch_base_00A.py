@@ -78,16 +78,16 @@ class mosfet:
     
     coef_p1 = np.array([
             [2.033, 0.000],
-            [0.515, 0.000],
-            [0.800, 3.000],
-            [0.393, 1.637]
+            [0.502, 0.000],
+            [1.250, 2.100],
+            [1.033, 1.826]
             ])
     
     coef_p2 = np.array([
             [3.567, 0.000],
-            [0.531, 0.000],
-            [0.800, 3.000],
-            [0.393, 1.637]
+            [0.503, 0.000],
+            [1.250, 2.100],
+            [1.033, 1.826]
             ])
     
     
@@ -165,17 +165,29 @@ class mosfet:
             
     def upd_caps(self):
 #        print(self.coef_n1.shape)
-        if self.type == 0: 
-            self.cgs = self.coef_n1[0, 0]*self.WL + self.coef_n1[0, 1]
-            self.cgd = self.coef_n1[1, 0]*self.WL + self.coef_n1[1, 1]
-            self.csb = self.coef_n1[2, 0]*self.WL + self.coef_n1[2, 1]
-            self.cdb = self.coef_n1[3, 0]*self.WL + self.coef_n1[3, 1]
-        if self.type == 1: 
-            self.cgs = self.coef_n2[0, 0]*self.WL + self.coef_n2[0, 1]
-            self.cgd = self.coef_n2[1, 0]*self.WL + self.coef_n2[1, 1]
-            self.csb = self.coef_n2[2, 0]*self.WL + self.coef_n2[2, 1]
-            self.cdb = self.coef_n2[3, 0]*self.WL + self.coef_n2[3, 1]
-           
+        try:
+            if self.type == 0: 
+                self.cgs = self.coef_n1[0, 0]*self.W + self.coef_n1[0, 1]
+                self.cgd = self.coef_n1[1, 0]*self.W + self.coef_n1[1, 1]
+                self.csb = self.coef_n1[2, 0]*self.W + self.coef_n1[2, 1]
+                self.cdb = self.coef_n1[3, 0]*self.W + self.coef_n1[3, 1]
+            if self.type == 1:
+                self.cgs = self.coef_n2[0, 0]*self.W + self.coef_n2[0, 1]
+                self.cgd = self.coef_n2[1, 0]*self.W + self.coef_n2[1, 1]
+                self.csb = self.coef_n2[2, 0]*self.W + self.coef_n2[2, 1]
+                self.cdb = self.coef_n2[3, 0]*self.W + self.coef_n2[3, 1]
+            if self.type == 2:
+                self.cgs = self.coef_p1[0, 0]*self.W + self.coef_p1[0, 1]
+                self.cgd = self.coef_p1[1, 0]*self.W + self.coef_p1[1, 1]
+                self.csb = self.coef_p1[2, 0]*self.W + self.coef_p1[2, 1]
+                self.cdb = self.coef_p1[3, 0]*self.W + self.coef_p1[3, 1]
+            if self.type == 3: 
+                self.cgs = self.coef_p2[0, 0]*self.W + self.coef_p2[0, 1]
+                self.cgd = self.coef_p2[1, 0]*self.W + self.coef_p2[1, 1]
+                self.csb = self.coef_p2[2, 0]*self.W + self.coef_p2[2, 1]
+                self.cdb = self.coef_p2[3, 0]*self.W + self.coef_p2[3, 1]
+        except:
+            print('error in mosfet.upd_caps()')
     
         
 def unit_test_mosfet(test_type):
@@ -190,8 +202,9 @@ class CG():
     def __init__(self):
         print_mosfet = 1
         self.M1   = mosfet('M1',  0, print_mosfet)
-        self.M1L  = mosfet('M1L', 1, print_mosfet)
+        self.M1L  = mosfet('M1L', 3, print_mosfet)
         self.M1B  = mosfet('M1B', 1, print_mosfet)
+        self.Id_1 = -1
         self.R_LCG= -1
         self.TI   = -1
         self.Rin  = -1
@@ -209,6 +222,7 @@ class CG():
         ee.print_C('   Cout', self.Cout)
         
     def _set(self, Vov_1, V_BN, V_BP, Id_1, R_LCG):
+        self.Id_1 = Id_1
         self.R_LCG = R_LCG
         r1 = self.M1._set (Vov_1, Id_1)
         r2 = self.M1L._set(V_BP,  Id_1)
@@ -249,10 +263,11 @@ def unit_test_CG():
 #%% CS
 class CS(mosfet):
     def __init__(self):
-        print_mosfet = 1
+        print_mosfet = 0
         self.M2   = mosfet('M2',  0, print_mosfet)
         self.M2L  = mosfet('ML2', 1, print_mosfet)
         self.M2B  = mosfet('MB2', 1, print_mosfet)
+        self.Id_2 = -1
         self.A1   = -1
         self.Rin  = -1
         self.Cin  = -1
@@ -268,6 +283,7 @@ class CS(mosfet):
         ee.print_C('   Cout', self.Cout)
         
     def _set(self, Vov_2, V_BN, Id_2, A1):  # A = -gain
+        self.Id_2 = Id_2
         self.A1 = A1
         r1 = self.M2._set(Vov_2, Id_2)
         r2 = self.M2B._set(V_BN, Id_2)
@@ -306,8 +322,10 @@ def unit_test_CS():
 class CD(mosfet):
     
     def __init__(self):
-        self.M3   = mosfet('M3',  0, 1)
-        self.M3B  = mosfet('M3B', 1, 1)
+        print_mosfet = 0
+        self.M3   = mosfet('M3',  0, print_mosfet)
+        self.M3B  = mosfet('M3B', 1, print_mosfet)
+        self.Id_3 = -1
         self.A2   = -1
         self.Rin  = -1
         self.Cin  = -1
@@ -327,6 +345,7 @@ class CD(mosfet):
         ee.print_C('    Cout', self.Cout)
         
     def _set(self, Vov_3, V_BN, Id_3): 
+        self.Id_3 = Id_3
         r1 = self.M3._set(Vov_3, Id_3)
         r2 = self.M3B._set(V_BN, Id_3)
         if r1 == -1 or r2 == -1:
