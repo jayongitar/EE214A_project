@@ -334,7 +334,7 @@ class CS(mosfet):
         r3 = self.M2L._set(1.2*Vov_2*A1, Id_2)
         if r1 == -1 or r2 == -1 or r3 == -1:
             return -1      
-        if self.M2L.Vov > 1.0:
+        if self.M2L.Vov > 0.67:
             return -2
         
         self.Rin  = 1E+21

@@ -158,7 +158,7 @@ class TIA(CG, CS, CD, PCM, CM):
             return 'cd-2'
 #        print(f'CG_mag: {self.CG_list[0]}')
 #        print(f'CD_mag: {self.CD_list[0]}')
-        A1 = 40000 / (self.CG_list[0]*self.CD_list[0])
+        A1 = 37000 / (self.CG_list[0]*self.CD_list[0])
 #        print(f'A1: {A1}')
         # cs._set(self, Vov_2, Vov_N, Id_2, A1):
         r2 = self.cs._set(self.Vov_2, self.Vov_N, self.pcm.get_Id_2(), A1)
@@ -339,15 +339,15 @@ def TIA_unit_test():
 
 class SWEEP(TIA):
     
-    _Vov_1   = np.linspace(0.3,   0.5,   5)
-    _Vov_2   = np.linspace(0.2,   0.4,   5)
-    _Vov_3   = np.linspace(0.2,   0.4,   5)
+    _Vov_1   = np.linspace(0.4,  0.5,    1)
+    _Vov_2   = np.linspace(0.25,  0.35,  5)
+    _Vov_3   = np.linspace(0.2,  0.25,   5)
     _Vov_N   = np.linspace(0.9,   1.2,   1)
     _Vov_P   = np.linspace(0.9,   1.2,   1)
-    _R_LCG   = np.linspace(1.5E+4,3E+4,  5)
-    _V1      = np.linspace(0.0,   0.5,   2)
-    _ratio_1 = np.linspace(0.3,   0.7,   4)  # ratio_1:  Id_1 to Id_3
-    _ratio_2 = np.linspace(0.12,  0.2,   4)  # ratio_2:  Id_2 to total
+    _R_LCG   = np.linspace(2E+4,  3.6E+4,10)
+    _V1      = np.linspace(0.4,   0.5,   1)
+    _ratio_1 = np.linspace(0.2,   0.5,   5)  # ratio_1:  Id_1 to Id_3
+    _ratio_2 = np.linspace(0.1,   0.15,  5)  # ratio_2:  Id_2 to total
     
     _FOM_Vov_1   = np.zeros(_Vov_1.shape[0])
     _FOM_Vov_2   = np.zeros(_Vov_2.shape[0])
@@ -359,7 +359,7 @@ class SWEEP(TIA):
     _FOM_ratio_1 = np.zeros(_ratio_1.shape[0])
     _FOM_ratio_2 = np.zeros(_ratio_2.shape[0])
     
-    total_iterations =         \
+    total_iterations =    \
             _Vov_1.shape[0]*   \
             _Vov_2.shape[0]*   \
             _Vov_3.shape[0]*   \
@@ -446,6 +446,8 @@ class SWEEP(TIA):
                                             count+=1
                                             set_ret = self._set(i1, i2, i3, i4, i5, i6, i7, i8, i9)
 #                                            print(f'count: {count}  set_ret: {set_ret}')
+                                            if  count % 1000 == 1:
+                                                print('time remaining %2.2f min' %( np.round((self.total_iterations - count)/60000, 2) ) )
                                             if set_ret == 0:
                                                 design = self.tia._get_design()
                                                 mosfets = self.tia._get_mosfets()
