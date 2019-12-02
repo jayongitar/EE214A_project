@@ -64,16 +64,23 @@ class mosfet:
     
     coef_n1 = np.array([
             [2.033, 0.000],
-            [0.515, 0.000],
+            [0.505, 0.000],
             [0.800, 3.000],
-            [0.393, 1.637]
+            [0.553, 2.188]
             ])
     
     coef_n2 = np.array([
             [3.567, 0.000],
-            [0.531, 0.000],
+            [0.509, 0.000],
             [0.800, 3.000],
-            [0.393, 1.637]
+            [0.553, 2.195]
+            ])
+    
+    coef_n4 = np.array([
+            [6.633, 0.000],
+            [0.506, 0.000],
+            [0.8,   3.000],
+            [0.678, 2.609]
             ])
     
     coef_p1 = np.array([
@@ -85,9 +92,9 @@ class mosfet:
     
     coef_p2 = np.array([
             [3.567, 0.000],
-            [0.503, 0.000],
+            [0.509, 0.000],
             [1.250, 2.100],
-            [1.033, 1.826]
+            [0.816, 1.541]
             ])
     
     coef_p4 = np.array([
@@ -105,7 +112,7 @@ class mosfet:
         self.Id  = 2E-5
         self.type= mosfet_type
         self.debug = debug
-        self.type_dict = {0:'nmos l=1u', 1:'nmos l=2u', 2:'pmos l=1u', 3:'pmos l=2u', 4:'pmos l=4u'}
+        self.type_dict = {1:'nmos l=1u', 2:'nmos l=2u', 4:'nmos l=4u', 5:'pmos l=1u', 6:'pmos l=2u', 8:'pmos l=4u'}
         # derived variables
         self.WL  = -1   
         self.W   = -1 # um
@@ -148,14 +155,15 @@ class mosfet:
         self.Id  = Id
         # WL = 2*Id / unCox*Vov^2
         # 0=nmos l=1, 1=nmos l=2, 2=pmos l=1, 3=pmos l=2
-        if self.type == 0 or self.type == 1:
+        if self.type == 1 or self.type == 2 or self.type == 4:
             self.WL = 2*self.Id / ( self.unCox*self.Vov**2 )
-            self.W  = self.WL*(self.type+1)
-            self.L  = self.type+1
-        if self.type == 2 or self.type == 3:
+            self.L  = self.type
+            self.W  = self.WL*(self.L)
+        if self.type == 5 or self.type ==6 or self.type == 8:
             self.WL = 2*self.Id / ( self.upCox*self.Vov**2 )
-            self.W  = self.WL*(self.type-1)
-            self.L  = self.type-1
+            self.L  = self.type-4
+            self.W  = self.WL*(self.L)
+            
         # check WL limits
         if self.W < 0.1 or self.W > 1000:
             print(f'mosfet {self.name}: out of range parameter: \n   Vov = {self.Vov} \n   Id = {self.Id} \n   WL={self.WL}')
@@ -169,31 +177,37 @@ class mosfet:
         if self.debug:
             self._print_all()
         return 0
-            
+             
     def upd_caps(self):
 #        print(self.coef_n1.shape)
         try:
-            if self.type == 0: 
+            if self.type == 1: 
                 self.cgs = self.coef_n1[0, 0]*self.W + self.coef_n1[0, 1]
                 self.cgd = self.coef_n1[1, 0]*self.W + self.coef_n1[1, 1]
                 self.csb = self.coef_n1[2, 0]*self.W + self.coef_n1[2, 1]
                 self.cdb = self.coef_n1[3, 0]*self.W + self.coef_n1[3, 1]
-            if self.type == 1:
+            if self.type == 2:
                 self.cgs = self.coef_n2[0, 0]*self.W + self.coef_n2[0, 1]
                 self.cgd = self.coef_n2[1, 0]*self.W + self.coef_n2[1, 1]
                 self.csb = self.coef_n2[2, 0]*self.W + self.coef_n2[2, 1]
                 self.cdb = self.coef_n2[3, 0]*self.W + self.coef_n2[3, 1]
-            if self.type == 2:
+            if self.type == 4:
+                self.cgs = self.coef_n4[0, 0]*self.W + self.coef_n4[0, 1]
+                self.cgd = self.coef_n4[1, 0]*self.W + self.coef_n4[1, 1]
+                self.csb = self.coef_n4[2, 0]*self.W + self.coef_n4[2, 1]
+                self.cdb = self.coef_n4[3, 0]*self.W + self.coef_n4[3, 1]
+                
+            if self.type == 5:
                 self.cgs = self.coef_p1[0, 0]*self.W + self.coef_p1[0, 1]
                 self.cgd = self.coef_p1[1, 0]*self.W + self.coef_p1[1, 1]
                 self.csb = self.coef_p1[2, 0]*self.W + self.coef_p1[2, 1]
                 self.cdb = self.coef_p1[3, 0]*self.W + self.coef_p1[3, 1]
-            if self.type == 3: 
+            if self.type == 6: 
                 self.cgs = self.coef_p2[0, 0]*self.W + self.coef_p2[0, 1]
                 self.cgd = self.coef_p2[1, 0]*self.W + self.coef_p2[1, 1]
                 self.csb = self.coef_p2[2, 0]*self.W + self.coef_p2[2, 1]
                 self.cdb = self.coef_p2[3, 0]*self.W + self.coef_p2[3, 1]
-            if self.type == 4: 
+            if self.type == 8: 
                 self.cgs = self.coef_p4[0, 0]*self.W + self.coef_p4[0, 1]
                 self.cgd = self.coef_p4[1, 0]*self.W + self.coef_p4[1, 1]
                 self.csb = self.coef_p4[2, 0]*self.W + self.coef_p4[2, 1]
@@ -231,9 +245,9 @@ def unit_test_mosfet(test_type):
 class CG():
     def __init__(self):
         print_mosfet = 0
-        self.M1L  = mosfet('M1L', 3, print_mosfet)
-        self.M1   = mosfet('M1',  0, print_mosfet)
-        self.M1B  = mosfet('M1B', 1, print_mosfet)
+        self.M1L  = mosfet('M1L', 6, print_mosfet)
+        self.M1   = mosfet('M1',  1, print_mosfet)
+        self.M1B  = mosfet('M1B', 2, print_mosfet)
         self.Id_1 = -1
         self.R_LCG= -1
         self.TI   = -1
@@ -294,9 +308,9 @@ def unit_test_CG():
 class CS(mosfet):
     def __init__(self):
         print_mosfet = 0
-        self.M2   = mosfet('M2',  0, print_mosfet)
-        self.M2L  = mosfet('ML2', 1, print_mosfet)
-        self.M2B  = mosfet('MB2', 1, print_mosfet)
+        self.M2   = mosfet('M2',  1, print_mosfet)
+        self.M2L  = mosfet('M2L', 4, print_mosfet)
+        self.M2B  = mosfet('M2B', 2, print_mosfet)
         self.Id_2 = -1
         self.A1   = -1
         self.Rin  = -1
@@ -319,7 +333,9 @@ class CS(mosfet):
         r2 = self.M2B._set(Vov_N, Id_2)
         r3 = self.M2L._set(1.2*Vov_2*A1, Id_2)
         if r1 == -1 or r2 == -1 or r3 == -1:
-            return -1       
+            return -1      
+        if self.M2L.Vov > 1.0:
+            return -2
         
         self.Rin  = 1E+21
         self.Rout = ee.parallel(0.5*self.M2.ro, 1/(self.M2L.gmp))
@@ -353,8 +369,8 @@ class CD(mosfet):
     
     def __init__(self):
         print_mosfet = 0
-        self.M3   = mosfet('M3',  0, print_mosfet)
-        self.M3B  = mosfet('M3B', 1, print_mosfet)
+        self.M3   = mosfet('M3',  1, print_mosfet)
+        self.M3B  = mosfet('M3B', 2, print_mosfet)
         self.Id_3 = -1
         self.A2   = -1
         self.Rin  = -1
@@ -491,9 +507,9 @@ def PCM_unit_test():
 class CM:
     def __init__(self):
         print_mosfet = 0
-        self.Mi1 = mosfet('Mi1', 1, print_mosfet)
-        self.Mi2 = mosfet('Mi2', 1, print_mosfet)
-        self.Mi3 = mosfet('Mi2', 3, print_mosfet)
+        self.Mi1 = mosfet('Mi1', 2, print_mosfet)
+        self.Mi2 = mosfet('Mi2', 2, print_mosfet)
+        self.Mi3 = mosfet('Mi2', 6, print_mosfet)
         self.Vov_N     = -1
         self.Vov_P     = -1
         self.Id_mirror = -1

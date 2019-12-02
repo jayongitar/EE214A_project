@@ -141,9 +141,21 @@ class TIA(CG, CS, CD, PCM, CM):
         # cg._set(self, Vov_1, Vov_N, Vov_P, Id_1, R_LCG):
         r1 = self.cg._set(self.Vov_1, self.Vov_N, self.Vov_P, self.pcm.get_Id_1(), self.pcm.get_R_LCG())
         self.CG_list = [self.cg.get_TI(), self.cg.get_Rin(), self.cg.get_Rout(), self.cg.get_Cin(), self.cg.get_Cout()]   
+        if r1 == -1:
+            print('cg._set returned -1')
+            return 'cg-1'
+        if r1 == -2:
+            print('cg._set returned -2')
+            return 'cg-2'
         # cd._set(self, Vov_3, Vov_N, Id_3):
         r3 = self.cd._set(self.Vov_3, self.Vov_N, self.pcm.get_Id_3())
         self.CD_list = [-self.cd.get_A2(), self.cd.get_Rin(), self.cd.get_Rout(), self.cd.get_Cin(), self.cd.get_Cout()]
+        if r3 == -1:
+            print('cd._set returned -1')
+            return 'cd-1'
+        if r3 == -2:
+            print('cd._set returned -2')
+            return 'cd-2'
 #        print(f'CG_mag: {self.CG_list[0]}')
 #        print(f'CD_mag: {self.CD_list[0]}')
         A1 = 40000 / (self.CG_list[0]*self.CD_list[0])
@@ -151,6 +163,12 @@ class TIA(CG, CS, CD, PCM, CM):
         # cs._set(self, Vov_2, Vov_N, Id_2, A1):
         r2 = self.cs._set(self.Vov_2, self.Vov_N, self.pcm.get_Id_2(), A1)
         self.CS_list = [-A1, self.cs.get_Rin(), self.cs.get_Rout(), self.cs.get_Cin(), self.cs.get_Cout()]
+        if r2 == -1:
+#            print('cs._set returned -1')
+            return 'cs-1'
+        if r2 == -2:
+#            print('cs._set returned -2')
+            return 'cs-2'
         
         # stage parameters: 0:mag, 1:Rin, 2:Rout, 3:Cin, 4:Cout
         self.M_list = [self.CG_list[0], self.CS_list[0], self.CD_list[0]]
@@ -171,10 +189,9 @@ class TIA(CG, CS, CD, PCM, CM):
         self.sys4_list[1] = self.CD_list[4]
         self.sys4_list[2] = -1/(6.28*1E-15 * self.sys4_list[0] * self.sys4_list[1])
         
-        
-        if r1 == -1 or r2 == -1 or r3 == -1:
-            print('invalid _in to tia._set')
-            return -1
+#        if r1 == -1 or r2 == -1 or r3 == -1:
+#            print('invalid _in to tia._set')
+#            return -1
 #        print(f'r1: {r1}')
 #        print(f'r2: {r2}')
 #        print(f'r3: {r3}')
@@ -322,15 +339,15 @@ def TIA_unit_test():
 
 class SWEEP(TIA):
     
-    _Vov_1   = np.linspace(0.2,   0.4,   4)
-    _Vov_2   = np.linspace(0.25,   0.25, 1)
-    _Vov_3   = np.linspace(0.3,   0.4,   4)
-    _Vov_N   = np.linspace(0.6,   0.7,   1)
-    _Vov_P   = np.linspace(0.6,   0.7,   1)
-    _R_LCG   = np.linspace(1.5E+4,2.0E+4,7)
-    _V1      = np.linspace(0.6,   0.7,   1)
-    _ratio_1 = np.linspace(0.3,   1.0,   7)  # ratio_1:  Id_1 to Id_3
-    _ratio_2 = np.linspace(0.15,   0.3,  7)  # ratio_2:  Id_2 to total
+    _Vov_1   = np.linspace(0.3,   0.5,   5)
+    _Vov_2   = np.linspace(0.2,   0.4,   5)
+    _Vov_3   = np.linspace(0.2,   0.4,   5)
+    _Vov_N   = np.linspace(0.9,   1.2,   1)
+    _Vov_P   = np.linspace(0.9,   1.2,   1)
+    _R_LCG   = np.linspace(1.5E+4,3E+4,  5)
+    _V1      = np.linspace(0.0,   0.5,   2)
+    _ratio_1 = np.linspace(0.3,   0.7,   4)  # ratio_1:  Id_1 to Id_3
+    _ratio_2 = np.linspace(0.12,  0.2,   4)  # ratio_2:  Id_2 to total
     
     _FOM_Vov_1   = np.zeros(_Vov_1.shape[0])
     _FOM_Vov_2   = np.zeros(_Vov_2.shape[0])
@@ -362,6 +379,7 @@ class SWEEP(TIA):
         self.tia = TIA()
         self.valid_point_list    = []
         self.invalid_point_list  = []
+        self.error_list          = []
         self.results_list        = []
         self.sorted_results_list = []
         self.top_results_list    = []
@@ -427,7 +445,7 @@ class SWEEP(TIA):
                                         for i9 in range(self._ratio_2.shape[0]):
                                             count+=1
                                             set_ret = self._set(i1, i2, i3, i4, i5, i6, i7, i8, i9)
-                                            print(f'count: {count}  set_ret: {set_ret}')
+#                                            print(f'count: {count}  set_ret: {set_ret}')
                                             if set_ret == 0:
                                                 design = self.tia._get_design()
                                                 mosfets = self.tia._get_mosfets()
@@ -460,13 +478,15 @@ class SWEEP(TIA):
                                                     self._FOM_ratio_2[i9] = self.tia.FOM    
 #                                                print(f'point: {count} valid')
                                                 self.valid_point_list.append('p:%d valid' %count)
-                                                    
-                                            if set_ret == -1:
-#                                                print('input out of range')
-                                                self.invalid_point_list.append('p:%d oor' %count)
-                                            if set_ret == -2:
-#                                                print('f3dB not found')
-                                                self.invalid_point_list.append('p:%d nf3' %count)
+                                            else:
+                                                self.error_list.append(set_ret)
+#                                                    
+#                                            if set_ret == -1:
+##                                                print('input out of range')
+#                                                self.invalid_point_list.append('p:%d oor' %count)
+#                                            if set_ret == -2:
+##                                                print('f3dB not found')
+#                                                self.invalid_point_list.append('p:%d nf3' %count)
 
         end_ms = int(round(time.time() * 1000))
         print(f'total time: {end_ms-start_ms} ms')
