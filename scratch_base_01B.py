@@ -230,12 +230,7 @@ class TIA(CG, CS, CD, PCM, CM):
         design[11]   = performance[0]
         design[12]  = performance[3]
         return design  
-    
-#    def _print_input(self):
-#        inputs = self._get_input()
-#        print('              Vov_1   Vov_2   Vov_3   Vov_N   Vov_P   R_LCG    V1   ratio_1 ratio_2  Ru   Rd')
-#        print(f'tia input: {inputs}')
-    
+
     def _get_input(self):        
         Vov_1 = np.round(self.Vov_1, 3)
         Vov_2 = np.round(self.Vov_2, 3)
@@ -270,7 +265,7 @@ class TIA(CG, CS, CD, PCM, CM):
         M1L = self.cg.M1L._get()
         M1  = self.cg.M1._get()
         M1B = self.cg.M1B._get()
-        
+    
         M2L = self.cs.M2L._get()
         M2  = self.cs.M2._get()
         M2B = self.cs.M2B._get()
@@ -304,15 +299,12 @@ class TIA(CG, CS, CD, PCM, CM):
 p = 0     
 def TIA_unit_test():
     tia = TIA()
-    # _in = (Vov_1, Vov_2, Vov_3, Vov_N, Vov_P, R_LCG, V1, ratio_1, ratio_2)
+    
     _in = [0.2, 0.2, 0.2, 0.5, 0.5, 2E+4, 0.0, 1, 0.2]
     r = tia._set(_in)
     print('-'*100)
     print(f'tia ret: {r}')
-#    tia._print_input()
-#    print()
-#    tia._print_performance()
-#    print()
+
     design = tia._get_design()
     out._print_design(design)
     print()
@@ -322,18 +314,7 @@ def TIA_unit_test():
     print()
     print('-'*100)
     
-#    performance_results = tia._get()
-#    print(f'performance_results: {performance_results}')
-    
-#    if p == 0:
-#        tia._print_input()
-#        tia._print_stage_params()
-#        tia._print_poles()
-#    else:
-#        print('invalid input into TIA._set')
-
-
-TIA_unit_test()
+#TIA_unit_test()
 
 
 
@@ -341,15 +322,15 @@ TIA_unit_test()
 
 class SWEEP(TIA):
     
-    _Vov_1   = np.linspace(0.2, 0.4, 3)
-    _Vov_2   = np.linspace(0.2, 0.4, 3)
-    _Vov_3   = np.linspace(0.3, 0.4, 3)
-    _Vov_N   = np.linspace(0.4, 0.5, 1)
-    _Vov_P   = np.linspace(0.4, 0.5, 1)
-    _R_LCG   = np.linspace(2E+4,2E+4,3)
-    _V1      = np.linspace(-0.2, 0.2, 3)
-    _ratio_1 = np.linspace(0.7, 1.4, 3)  # ratio_1:  Id_1 to Id_3
-    _ratio_2 = np.linspace(0.2, 0.4, 4)  # ratio_2:  Id_2 to total
+    _Vov_1   = np.linspace(0.2,   0.4,   4)
+    _Vov_2   = np.linspace(0.25,   0.25, 1)
+    _Vov_3   = np.linspace(0.3,   0.4,   4)
+    _Vov_N   = np.linspace(0.6,   0.7,   1)
+    _Vov_P   = np.linspace(0.6,   0.7,   1)
+    _R_LCG   = np.linspace(1.5E+4,2.0E+4,7)
+    _V1      = np.linspace(0.6,   0.7,   1)
+    _ratio_1 = np.linspace(0.3,   1.0,   7)  # ratio_1:  Id_1 to Id_3
+    _ratio_2 = np.linspace(0.15,   0.3,  7)  # ratio_2:  Id_2 to total
     
     _FOM_Vov_1   = np.zeros(_Vov_1.shape[0])
     _FOM_Vov_2   = np.zeros(_Vov_2.shape[0])
@@ -360,6 +341,21 @@ class SWEEP(TIA):
     _FOM_V1      = np.zeros(_V1.shape[0])
     _FOM_ratio_1 = np.zeros(_ratio_1.shape[0])
     _FOM_ratio_2 = np.zeros(_ratio_2.shape[0])
+    
+    total_iterations =         \
+            _Vov_1.shape[0]*   \
+            _Vov_2.shape[0]*   \
+            _Vov_3.shape[0]*   \
+            _Vov_N.shape[0]*   \
+            _Vov_P.shape[0]*   \
+            _R_LCG.shape[0]*   \
+            _V1.shape[0]*      \
+            _ratio_1.shape[0]* \
+            _ratio_2.shape[0]
+                        
+    print(f'total iterations: {total_iterations}')
+                        
+                        
     
    
     def __init__(self):
@@ -462,34 +458,20 @@ class SWEEP(TIA):
                                                     self._FOM_ratio_1[i8] = self.tia.FOM
                                                 if self.tia.FOM > self._FOM_ratio_2[i9]:
                                                     self._FOM_ratio_2[i9] = self.tia.FOM    
-                                                print(f'point: {count} valid')
+#                                                print(f'point: {count} valid')
                                                 self.valid_point_list.append('p:%d valid' %count)
                                                     
                                             if set_ret == -1:
-                                                print('input out of range')
+#                                                print('input out of range')
                                                 self.invalid_point_list.append('p:%d oor' %count)
                                             if set_ret == -2:
-                                                print('f3dB not found')
+#                                                print('f3dB not found')
                                                 self.invalid_point_list.append('p:%d nf3' %count)
-                                                
 
-#        print(f'results list: {self.results_list}')
-        
-#        print(f'max_count: {max_count}')
         end_ms = int(round(time.time() * 1000))
         print(f'total time: {end_ms-start_ms} ms')
-#        print(self.valid_point_list)
-#        print()
-#        print(self.invalid_point_list)
-        
-        
-        
-#    FOMs = results[:,0]
-#    print(f'FOMs: {FOMs}')
-#    argsort_FOMs = np.argsort(FOMs)
-#    print(f'argsort_FOMs: {argsort_FOMs}')
-        
-    
+        print(f'{len(self.valid_point_list)} valid points')
+        print(f'{len(self.invalid_point_list)} invalid points')
         
     def _sort(self):
         temp_results_list = self.results_list
@@ -497,11 +479,12 @@ class SWEEP(TIA):
         
         _FOM = np.zeros(len(temp_results_list))
         for i in range(len(temp_results_list)):
-            _FOM[i] = (temp_results_list[i][0][9])
+            _FOM[i] = (temp_results_list[i][0][11])
             
-        print(f'_FOM: {_FOM}')
+#        print(f'_FOM: {_FOM}')
+        print(f'FOM_max: {np.max(_FOM)}')
         argsort_FOM = np.argsort(-_FOM) # negative sign to sort from highes to lowest
-        print(f'args: {argsort_FOM}')
+#        print(f'args: {argsort_FOM}')
         
         self.top_results_list = []
         for i in range(len(temp_results_list)):
@@ -527,93 +510,58 @@ class SWEEP(TIA):
             out._print_design(val[0])
             out._print_mosfets(val[1])
         
-    def _plot(self):
- 
-        fig1 = plt.figure(1)
-        fig1.clf()
-        fig1.suptitle('Vov_1')
-        ax = fig1.add_subplot(111)
-        ax.set_xlabel('Vov_1')
+    def _print_total_iterations(self):
+        print(f'total iterations: {self.total_iterations}')
+    
+    def _plot_single(self, fig_num, name, x, y):
+        fig = plt.figure(fig_num)
+        fig.clf()
+        fig.suptitle(name)
+        ax = fig.add_subplot(111)
+        ax.set_xlabel(name)
         ax.set_ylabel('FOM')
-        ax.plot(self._Vov_1, self._FOM_Vov_1)
+        ax.plot(x, y)
         ax.grid()
+
+    # Vov_1, Vov_2, Vov_3, Vov_N, Vov_P, R_LCG, V1, ratio_1, ratio_2
+    def _plot(self, f1, f2, f3, f4, f5, f6, f7, f8, f9):
+        if (f1):
+            self._plot_single(1, 'Vov_1', self._Vov_1, self._FOM_Vov_1)
+        if (f2):
+            self._plot_single(2, 'Vov_2', self._Vov_2, self._FOM_Vov_2)
+        if (f3):
+            self._plot_single(3, 'Vov_3', self._Vov_3, self._FOM_Vov_3)
+        if (f4):
+            self._plot_single(4, 'Vov_N', self._Vov_N, self._FOM_Vov_N)
+        if (f5):
+            self._plot_single(5, 'Vov_P', self._Vov_P, self._FOM_Vov_P)
+        if (f6):
+            self._plot_single(6, 'R_LCG', self._R_LCG, self._FOM_R_LCG)
+        if (f7):
+            self._plot_single(7, 'V1',    self._V1, self._FOM_V1)
+        if (f8):
+            self._plot_single(8, 'ratio_1', self._ratio_1, self._FOM_ratio_1)
+        if (f9):
+            self._plot_single(9, 'ratio_2', self._ratio_2, self._FOM_ratio_2)
         
 
 def SWEEP_unit_test():
     sweep = SWEEP()
+    sweep._print_total_iterations()
+    
     sweep.iterate()
 #    sweep._print()
     print()
     print()
     sweep._sort()
-#    sweep._print()
+
     print()
     print()
     sweep._print_top()
+    sweep._plot(1, 1, 1, 1, 1, 1, 1, 1, 1)
 #    sweep._plot()
     
-
-#SWEEP_unit_test()
-
-
-
-
-
-
-#        fig2 = plt.figure(2)
-#        fig2.clf()
-#        fig2.suptitle('Vov_2')
-#        ax = fig2.add_subplot(111)
-#        ax.set_xlabel('Vov_2')
-#        ax.set_ylabel('FOM')
-#        ax.plot(self._Vov_2, self._FOM_Vov_2)
-#        ax.grid()
-#        
-#        fig3 = plt.figure(3)
-#        fig3.clf()
-#        fig3.suptitle('Vov_3')
-#        ax = fig3.add_subplot(111)
-#        ax.set_xlabel('Vov_3')
-#        ax.set_ylabel('FOM')
-#        ax.plot(self._Vov_3, self._FOM_Vov_3)
-#        ax.grid()
-#        
-#        fig4 = plt.figure(4)
-#        fig4.clf()
-#        fig4.suptitle('R_LCG')
-#        ax = fig4.add_subplot(111)
-#        ax.set_xlabel('R_LCG')
-#        ax.set_ylabel('FOM')
-#        ax.plot(self._R_LCG, self._FOM_R_LCG)
-#        ax.grid()
-        
-#        fig5 = plt.figure(5)
-#        fig5.clf()
-#        fig5.suptitle('V1')
-#        ax = fig5.add_subplot(111)
-#        ax.set_xlabel('V1')
-#        ax.set_ylabel('FOM')
-#        ax.plot(self._V1, self._FOM_V1)
-#        ax.grid()        
-#        
-#        fig6 = plt.figure(6)
-#        fig6.clf()
-#        fig6.suptitle('I_ratio_1')
-#        ax = fig6.add_subplot(111)
-#        ax.set_xlabel('I_ratio_1')
-#        ax.set_ylabel('FOM')
-#        ax.plot(self._I_ratio_1, self._FOM_I_ratio_1)
-#        ax.grid()
-#        
-#        fig7 = plt.figure(7)
-#        fig7.clf()
-#        fig7.suptitle('I_ratio_2')
-#        ax = fig7.add_subplot(111)
-#        ax.set_xlabel('_I_ratio_2')
-#        ax.set_ylabel('FOM')
-#        ax.plot(self._I_ratio_2, self._FOM_I_ratio_2)
-#        ax.grid()
-        
+SWEEP_unit_test()
 
 
 
@@ -622,150 +570,6 @@ def SWEEP_unit_test():
 
 
 
-#%% old
-
-
-
-#        # inputs:
-#        self.Vov_1 = -1
-#        self.Vov_2 = -1
-#        self.Vov_3 = -1
-#        self.Vov_N = -1
-#        self.Vov_P = -1
-#        self.R_LCG = -1
-#        self.V1    = -1
-#        self.ratio_1 = -1
-#        self.ratio_2 = -1
-#        self.inputs = []
-#        
-#        # performance:
-#        self.FOM   = -1
-#        self.f3dB  = [-1, -1, -1, -1]
-#        self.performance = []
-#        
-#        # Hspice outputs:
-#        self.M1L_W = -1
-#        self.M1_W  = -1
-#        self.M1B_W = -1
-#        
-#        self.M2L_W = -1
-#        self.M2_W  = -1
-#        self.M2B_W = -1
-#        
-#        self.M3_W  = -1
-#        self.M3B_W = -1
-#        
-#        self.Ru    = -1
-#        self.Rd    = -1
-#        
-#        self.Id_1  = -1
-#        self.Id_2  = -1
-#        self.Id_3  = -1
-#        self.Hspice_outputs = []
-
-
-
-
-
-
-
-#        if tia_ret == 0:
-#            self.FOM  = self.tia.FOM          
-#            self.f3dB = self.tia.f3dB_list 
-#            
-#            self.M1_W  = self.tia.cg.M1.W      # 14
-#            self.M1L_W = self.tia.cg.M1L.W     # 15
-#            self.M1B_W = self.tia.cg.M1B.W     # 16
-#        
-#            self.M2_W  = self.tia.cs.M2.W      # 17
-#            self.M2L_W = self.tia.cs.M2L.W     # 18
-#            self.M2B_W = self.tia.cs.M2B.W     # 19
-#    
-#            self.M3_W  = self.tia.cd.M3.W      # 20
-#            self.M3B_W = self.tia.cd.M3B.W     # 21
-#    
-#            self.Ru    = self.tia.pcm.Ru       # 22
-#            self.Rd    = self.tia.pcm.Rd       # 23
-#        
-#            self.Id_1  = self.tia.cg.Id_1      # 24
-#            self.Id_2  = self.tia.cs.Id_2      # 25
-#            self.Id_3  = self.tia.cd.Id_3      # 26     
-#            return 0
-#        return -1
-        
-#    def _print(self):
-#        print('-'*40)
-#        print('_print():')
-#        print('  FOM:     %3.0f'       %(1E-0*self.results[0 ]))
-#        print('  f3dB1:   %3.2f MHz'   %(1E-6*self.results[1 ]))
-#        print('  f3dB2:   %3.2f MHz'   %(1E-6*self.results[2 ]))
-#        print('  f3dB3:   %3.2f MHz'   %(1E-6*self.results[3 ]))
-#        print('  f3dB4:   %3.2f MHz'   %(1E-6*self.results[4 ]))
-#        print()
-#        print('  Vov_1:   %3.2f V'     %(1E-0*self.results[6 ]))
-#        print('  Vov_2:   %3.2f V'     %(1E-0*self.results[7 ]))
-#        print('  Vov_3:   %3.2f V'     %(1E-0*self.results[8 ]))
-#        print('  Vov_N:   %3.2f V'     %(1E-0*self.results[9 ]))
-#        print('  Vov_P:   %3.2f V'     %(1E-0*self.results[10]))
-#        print('  R_LCG:   %3.2f kohms' %(1E-3*self.results[11]))
-#        print('  V1:      %3.2f V'     %(1E-0*self.results[12]))
-#        print('  ratio_1: %3.2f'       %(1E-0*self.results[13]))
-#        print('  ratio_2: %3.2f'       %(1E-0*self.results[14]))
-#        print()
-#        print('  M1L_W: %3.1f'         %(1E-0*self.results[15]))
-#        print('  M1_W:  %3.1f'         %(1E-0*self.results[16]))
-#        print('  M1B_W: %3.1f'         %(1E-0*self.results[17]))
-#        print()
-#        print('  M2L_W: %3.1f'         %(1E-0*self.results[18]))
-#        print('  M2_W:  %3.1f'         %(1E-0*self.results[19]))
-#        print('  M2B_W: %3.1f'         %(1E-0*self.results[20]))
-#        print()
-#        print('  M3_W:  %3.1f'         %(1E-0*self.results[21]))
-#        print('  M3B_W: %3.1f'         %(1E-0*self.results[22]))
-#        print()
-#        print('  Ru:    %3.1f kohms'   %(1E-3*self.results[23]))
-#        print('  Rd:    %3.1f kohms'   %(1E-3*self.results[24]))
-#        print()
-#        print('  Id_1:  %3.1f uA'      %(1E+6*self.results[25]))
-#        print('  Id_2:  %3.1f uA'      %(1E+6*self.results[26]))
-#        print('  Id_3:  %3.1f uA'      %(1E+6*self.results[27]))
-#        print('-'*40)
-#        
-#    def _get_inputs(self):
-#        self.inputs = []
-#        self.inputs = [self.Vov_1,
-#                       self.Vov_2,
-#                       self.Vov_3,
-#                       self.Vov_N,
-#                       self.Vov_P,
-#                       self.R_LCG,
-#                       self.ratio_1,
-#                       self.ratio_2]
-#        
-#        return self.inputs
-#    
-#    def _get_performance(self):
-#        self.performance = []
-#        self.performance = [self.FOM, self.f3dB[0], self.f3dB[1], self.f3dB[2], self.f3dB[3]]
-#        
-#        return self.performance
-#    
-#    def _get_Hspice_outputs(self):
-#        self.Hspice_outputs = []
-#        self.Hspice_outputs = [self.M1L_W,
-#                               self.M1_W,
-#                               self.M1B_W,
-#                               self.M2L_W,
-#                               self.M2_W,
-#                               self.M2B_W,
-#                               self.M3_W,
-#                               self.M3B_W,
-#                               self.Ru,
-#                               self.Rd]
-#        
-#        return self.Hspice_outputs
-#    
-  
 
 
 

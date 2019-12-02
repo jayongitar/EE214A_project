@@ -152,12 +152,12 @@ class mosfet:
             self.WL = 2*self.Id / ( self.unCox*self.Vov**2 )
             self.W  = self.WL*(self.type+1)
             self.L  = self.type+1
-        if self.type == 2 or self.type == 3 or self.type == 4:
+        if self.type == 2 or self.type == 3:
             self.WL = 2*self.Id / ( self.upCox*self.Vov**2 )
             self.W  = self.WL*(self.type-1)
             self.L  = self.type-1
         # check WL limits
-        if self.W < 0.5 or self.W > 1000:
+        if self.W < 0.1 or self.W > 1000:
             print(f'mosfet {self.name}: out of range parameter: \n   Vov = {self.Vov} \n   Id = {self.Id} \n   WL={self.WL}')
             return -1
             
@@ -207,18 +207,18 @@ class mosfet:
         return self.L
     def _get(self):
         return [np.round(1E+0*self.Vov, 2), 
-                np.round(1E+6*self.Id,  0), 
-                np.round(1E+0*self.type,0), 
-                np.round(1E+0*self.WL,  1), 
-                np.round(1E+0*self.W,   1), 
-                np.round(1E+0*self.L,   1), 
-                np.round(1E+3*self.gm,  1), 
-                np.round(1E+3*self.gmp, 1), 
-                np.round(1E-3*self.ro,  0), 
-                np.round(1E+0*self.cgs, 1), 
-                np.round(1E+0*self.cgd, 1), 
-                np.round(1E+0*self.csb, 1), 
-                np.round(1E+0*self.cdb, 1)]
+                np.round(1E+6*self.Id,  2), 
+                np.round(1E+0*self.type,2), 
+                np.round(1E+0*self.WL,  2), 
+                np.round(1E+0*self.W,   2), 
+                np.round(1E+0*self.L,   2), 
+                np.round(1E+3*self.gm,  2), 
+                np.round(1E+3*self.gmp, 2), 
+                np.round(1E-3*self.ro,  2), 
+                np.round(1E+0*self.cgs, 2), 
+                np.round(1E+0*self.cgd, 2), 
+                np.round(1E+0*self.csb, 2), 
+                np.round(1E+0*self.cdb, 2)]
         
 def unit_test_mosfet(test_type):
     nmos_1 = mosfet(0, 0)  # (type, debug)
@@ -231,8 +231,8 @@ def unit_test_mosfet(test_type):
 class CG():
     def __init__(self):
         print_mosfet = 0
-        self.M1   = mosfet('M1',  0, print_mosfet)
         self.M1L  = mosfet('M1L', 3, print_mosfet)
+        self.M1   = mosfet('M1',  0, print_mosfet)
         self.M1B  = mosfet('M1B', 1, print_mosfet)
         self.Id_1 = -1
         self.R_LCG= -1
