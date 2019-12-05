@@ -58,7 +58,8 @@ class TIA(CG, CS, CD, PCM, CM):
         self.Vov_2 = -1
         self.Vov_3 = -1
         self.Vov_N = -1
-        self.Vov_P  = -1
+        self.Vov_P = -1
+        self.A1    = -1
         # stage parameters: mag, Rin, Rout, Cin, Cout
         self.CG_list = [-1, -1, -1, -1, -1]
         self.CS_list = [-1, -1, -1, -1, -1]
@@ -189,15 +190,6 @@ class TIA(CG, CS, CD, PCM, CM):
         self.sys4_list[1] = self.CD_list[4]
         self.sys4_list[2] = -1/(6.28*1E-15 * self.sys4_list[0] * self.sys4_list[1])
         
-#        if r1 == -1 or r2 == -1 or r3 == -1:
-#            print('invalid _in to tia._set')
-#            return -1
-#        print(f'r1: {r1}')
-#        print(f'r2: {r2}')
-#        print(f'r3: {r3}')
-#        print(f'M: {self.M_list}')
-#        print('Done _setting')
-        
         n   = 75
         mag1   = np.zeros(n)
         mag2   = np.zeros(n)
@@ -238,6 +230,89 @@ class TIA(CG, CS, CD, PCM, CM):
             return -2
         self.FOM = 40*(1E-6*self.f3dB_list[3])/2
         return 0
+    
+    
+    # _in = (Vov_1, Vov_2, Vov_3, Vov_N, Vov_P, R_LCG, V1, ratio_1, ratio_2)
+    def _set_raw(self):
+       
+        # cg._set_raw(W_L1, L_L1, W_1, L_1, W_B1, L_B1, Id_1, R_LCG):
+        r1 = self.cg._set_raw(5.2, 2, 6.4, 1, 4.2, 1, 26E-6, 32E+3)
+        self.CG_list = [self.cg.get_TI(), self.cg.get_Rin(), self.cg.get_Rout(), self.cg.get_Cin(), self.cg.get_Cout()]   
+        
+        # cs._set_raw(self, W_L2, L_L2, W_2, L_2, W_B2, L_B2, Id_2):
+        r2 = self.cs._set_raw(3.2, 2, 7.0, 1, 2.8, 2, 18E-6)
+        self.CS_list = [-self.A1, self.cs.get_Rin(), self.cs.get_Rout(), self.cs.get_Cin(), self.cs.get_Cout()]
+
+        # cd._set_raw(W_3, L_3, W_B3, L_B3, Id_3):
+        r3 = self.cd._set_raw(36.6, 1, 9.6, 2, 62E-6)
+        self.CD_list = [-self.cd.get_A2(), self.cd.get_Rin(), self.cd.get_Rout(), self.cd.get_Cin(), self.cd.get_Cout()]
+        
+        r4 = self.cm._set_raw(3.2, 2, 3.2, 2, 4.4, 2, 2E-5)
+        
+        
+        # stage parameters: 0:mag, 1:Rin, 2:Rout, 3:Cin, 4:Cout
+        self.M_list = [self.CG_list[0], self.CS_list[0], self.CD_list[0]]
+        # CG in
+        self.sys1_list[0] = self.CG_list[1]  # Rin_CG
+        self.sys1_list[1] = self.CG_list[3]  # Cin_CG
+        self.sys1_list[2] = -1/(6.28*1E-15 * self.sys1_list[0] * self.sys1_list[1])
+        # CS in, CG_out
+        self.sys2_list[0] = ee.parallel(self.CS_list[1], self.CG_list[2])
+        self.sys2_list[1] = self.CS_list[3]+ self.CG_list[4]
+        self.sys2_list[2] = -1/(6.28*1E-15 * self.sys2_list[0] * self.sys2_list[1])
+        # CD in, CS out
+        self.sys3_list[0] = ee.parallel(self.CD_list[1], self.CS_list[2])
+        self.sys3_list[1] = self.CD_list[3]+ self.CS_list[4]
+        self.sys3_list[2] = -1/(6.28*1E-15 * self.sys3_list[0] * self.sys3_list[1])
+        # CD out
+        self.sys4_list[0] = self.CD_list[2]
+        self.sys4_list[1] = self.CD_list[4]
+        self.sys4_list[2] = -1/(6.28*1E-15 * self.sys4_list[0] * self.sys4_list[1])
+        
+        n   = 75
+        mag1   = np.zeros(n)
+        mag2   = np.zeros(n)
+        mag3   = np.zeros(n)
+        mag4   = np.zeros(n)
+        mag_H1 = np.zeros(n)
+        mag_H2 = np.zeros(n)
+        mag_H3 = np.zeros(n)
+        mag_H4 = np.zeros(n)
+        
+        _freq = np.logspace(6, 9, n)
+        for i in range(n):
+            mag1[i] = abs(self.sys1_list[2])  /np.sqrt(self.sys1_list[2]**2 + _freq[i]**2)
+            mag2[i] = abs(self.sys2_list[2]) / np.sqrt(self.sys2_list[2]**2 + _freq[i]**2)
+            mag3[i] = abs(self.sys3_list[2]) / np.sqrt(self.sys3_list[2]**2 + _freq[i]**2)
+            mag4[i] = abs(self.sys4_list[2]) / np.sqrt(self.sys4_list[2]**2 + _freq[i]**2)
+            mag_H1[i] = mag1[i]
+            mag_H2[i] = mag1[i]*mag2[i]
+            mag_H3[i] = mag1[i]*mag2[i]*mag3[i]
+            mag_H4[i] = mag1[i]*mag2[i]*mag3[i]*mag4[i]
+        
+        try:
+            mag1_f = interpolate.interp1d(mag_H1,  _freq)
+            mag2_f = interpolate.interp1d(mag_H2, _freq)
+            mag3_f = interpolate.interp1d(mag_H3, _freq)
+            mag4_f = interpolate.interp1d(mag_H4, _freq)
+            self.f3dB_list[0] = mag1_f(0.71)
+            self.f3dB_list[1] = mag2_f(0.71)
+            self.f3dB_list[2] = mag3_f(0.71)
+            self.f3dB_list[3] = mag4_f(0.71)
+            print('f3dB1: %3.3f MHz' %(1E-6*self.f3dB_list[0]))
+            print('f3dB2: %3.3f MHz' %(1E-6*self.f3dB_list[1]))
+            print('f3dB3: %3.3f MHz' %(1E-6*self.f3dB_list[2]))
+            print('f3dB4: %3.3f MHz' %(1E-6*self.f3dB_list[3]))
+
+        except:
+            print('no cutoff freq found')
+            return -2
+        self.FOM = 40*(1E-6*self.f3dB_list[3])/2
+        return [_freq, mag_H4]
+    
+    
+    
+    
     
     def _get_design(self):
         design = np.zeros((14))
@@ -318,7 +393,7 @@ p = 0
 def TIA_unit_test():
     tia = TIA()
     
-    _in = [0.4, 0.3, 0.23, 0.7, 0.9, 3.2E+4, 0.0, 0.42, 0.2, 0.0015]
+    _in = [0.4, 0.3, 0.23, 0.7, 0.9, 3.2E+4, 0.0, 0.4, 0.15, 0.00145]
     r = tia._set(_in)
     print('-'*100)
     print(f'tia ret: {r}')
@@ -334,7 +409,184 @@ def TIA_unit_test():
     print()
     print('-'*100)
     
-TIA_unit_test()
+#TIA_unit_test()
+
+
+
+
+def TIA_raw_unit_test():
+    tia = TIA()
+    
+    r = tia._set_raw()
+    print('-'*100)
+    print(f'tia ret: {r}')
+
+    design = tia._get_design()
+    out._print_design(design)
+    tia._print_stage_params()
+    tia._print_poles()
+    print()
+#    
+    design  = tia._get_design()
+    out._print_design(design)
+    mosfets = tia._get_mosfets()
+    out._print_mosfets(mosfets)
+    print()
+    print('-'*100)
+    return r
+    
+r = TIA_raw_unit_test()
+
+print(r[0].shape)
+print(r[1].shape)
+
+
+freq = [0.001,
+0.0011,
+0.0013,
+0.0015,
+0.0015,
+0.0018,
+0.002,
+0.0023,
+0.0027,
+0.0031,
+0.0035,
+0.0041,
+0.0047,
+0.0054,
+0.0062,
+0.0071,
+0.0081,
+0.0093,
+0.0107,
+0.0123,
+0.0141,
+0.0162,
+0.0186,
+0.0214,
+0.0245,
+0.0282,
+0.0324,
+0.0372,
+0.0427,
+0.049,
+0.0562,
+0.0646,
+0.0741,
+0.0851,
+0.0977,
+0.1122,
+0.1288,
+0.1479,
+0.1698,
+0.195,
+0.2239,
+0.257,
+0.2951,
+0.3388,
+0.389,
+0.4467,
+0.5129,
+0.5888,
+0.6761,
+0.871,
+1]
+
+mag = [4.0074,
+4.0073,
+4.0072,
+4.0071,
+4.007,
+4.0068,
+4.0066,
+4.0063,
+4.0058,
+4.0053,
+4.0045,
+4.0035,
+4.0022,
+4.0005,
+3.9983,
+3.9953,
+3.9914,
+3.9863,
+3.9795,
+3.9706,
+3.9589,
+3.9436,
+3.9235,
+3.8972,
+3.8629,
+3.8183,
+3.7606,
+3.6861,
+3.5909,
+3.47,
+3.3186,
+3.1315,
+2.9048,
+2.637,
+2.3305,
+1.994,
+1.6431,
+1.299,
+0.9836,
+0.7142,
+0.499,
+0.3372,
+0.2215,
+0.1423,
+0.0898,
+0.0559,
+0.0345,
+0.0212,
+0.013,
+0.0053,
+0.0033]
+
+freq1 = [1E+9*f for f in freq]
+mag1  = [1E+4*m for m in mag ]
+
+f_mag = interpolate.interp1d(freq1, mag1)
+hspice_mag = f_mag(76.9E+6)
+print(f'hspice mag: {hspice_bw}')
+
+p_mag = interpolate.interp1d(r[0], r[1])
+
+
+p1_mag = p_mag(71.43E+6)
+#p2_mag = p_mag(162.3E+6)
+#p3_mag = p_mag(261E+6)
+#p4_mag = p_mag(200E+6)
+
+
+
+fig = plt.figure(1)
+fig.clf()
+fig.suptitle('freq response of TIA')
+ax  = fig.add_subplot(1, 1, 1)
+ax.grid()
+ax.set_xlabel('freq [Hz]')
+ax.set_ylabel('mag [dB]')
+ax.semilogx((r[0]), 20*np.log10(4E+4*r[1]), color = 'orange', label = 'square-law')
+ax.semilogx(freq1, 20*np.log10(mag1), 'k--', linewidth = 1.0, label = 'hspice')
+
+ax.semilogx((76.9)*1E+6, 20*np.log10(hspice_mag), 'kx', markersize=8)
+
+ax.semilogx((71.43)*1E+6, 20*np.log10(4E+4*p1_mag), 'rx', markersize=8)
+#ax.semilogx((162.3)*1E+6, 20*np.log10(4E+4*p2_mag), 'kx', markersize=5)
+#ax.semilogx((261.0)*1E+6, 20*np.log10(4E+4*p3_mag), 'kx', markersize=5)
+#ax.semilogx((200.0)*1E+6, 20*np.log10(4E+4*p4_mag), 'kx', markersize=5)
+
+#ax.text(80, 1E+8, 'f3dB', fontsize=10)
+
+ax.legend()
+
+
+
+
+
 
 
 

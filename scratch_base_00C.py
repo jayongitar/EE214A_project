@@ -105,7 +105,7 @@ class mosfet:
             ])
     
     
-    def __init__(self, name, mosfet_type, debug):  # 0=nmos l=1, 1=nmos l=2, 2=pmos l=1, 3=pmos l=2
+    def __init__(self, name, mosfet_type, debug):  # 1=nmos l=1,  2=nmos l=2,  4=nmos l=4,  5=pmos l=1,  6=pmos l=2,  8=pmos l=4
         # set variables
         self.name = name
         self.Vov = 0.2
@@ -127,7 +127,7 @@ class mosfet:
         
     def _print(self):
         print(f'mosfet {self.name}')
-        print(f' type: {self.type_dict[self.type]}')
+        print(f' type: {self.type}')
         print(' input variables:')
         print('  Vov= %2.2fV' %self.Vov)
         print('  Id =%3.0fuA' %(1E+6*self.Id))
@@ -177,10 +177,27 @@ class mosfet:
         if self.debug:
             self._print_all()
         return 0
+    
+    def _set_raw(self, W, L, Id):
+        self.W  = W
+        self.L  = L
+        self.Id = Id
+ 
+        self.WL = self.W / self.L
+        self.Vov = np.sqrt((2*self.Id) / (self.unCox*self.WL))
+        self.gm = 2*self.Id/self.Vov
+        self.gmp= 1.2*self.gm
+        self.ro = 1/(self.lambd*self.Id)
+        
+        self.upd_caps()
+        if self.debug:
+            self._print_all()
+        return 0
              
     def upd_caps(self):
 #        print(self.coef_n1.shape)
         try:
+            print('updating caps')
             if self.type == 1: 
                 self.cgs = self.coef_n1[0, 0]*self.W + self.coef_n1[0, 1]
                 self.cgd = self.coef_n1[1, 0]*self.W + self.coef_n1[1, 1]
@@ -235,9 +252,12 @@ class mosfet:
                 np.round(1E+0*self.cdb, 2)]
         
 def unit_test_mosfet(test_type):
-    nmos_1 = mosfet(0, 0)  # (type, debug)
-    nmos_1._set(0.2, 1E-5)
-    nmos_1.print_all()
+    nmos_1 = mosfet('test mosfet', 1, 1)  # (type, debug)
+#    nmos_1._set(0.2, 1E-5)
+#    nmos_1._print()
+    nmos_1._set_raw(2, 2, 1E-5)
+    nmos_1.upd_caps()
+    nmos_1._print_caps()
     
 #unit_test_mosfet(1)
 
@@ -266,11 +286,11 @@ class CG():
         ee.print_C('   Cout', self.Cout)
         
     def _set(self, Vov_1, Vov_N, Vov_P, Id_1, R_LCG):
-        self.Id_1 = Id_1
+        self.Id_1  = Id_1
         self.R_LCG = R_LCG
         r1 = self.M1._set (Vov_1, Id_1)
-        r2 = self.M1L._set(Vov_P,  Id_1)
-        r3 = self.M1B._set(Vov_N,  Id_1)
+        r2 = self.M1L._set(Vov_P, Id_1)
+        r3 = self.M1B._set(Vov_N, Id_1)
         if r1 == -1 or r2 == -1 or r3 == -1:
             print('failed to set a mosfet parameters in CG.')
             return -1  
@@ -282,6 +302,36 @@ class CG():
         self.Cin  = self.M1.cgs + self.M1.csb + self.M1B.cgd + self.M1B.cdb + self.C_IN
         self.Cout = self.M1.cgd + self.M1.cdb + self.M1L.cgd + self.M1L.cdb
         self.TI   = self.Rout
+        return 0
+    
+    def _set_raw(self, W_L1, L_L1, W_1, L_1, W_B1, L_B1, Id_1, R_LCG):
+        self.W_L1 = W_L1
+        self.L_L1 = L_L1
+        
+        self.W_1  = W_1
+        self.L_1  = L_1
+        
+        self.W_B1 = W_B1
+        self.L_B1 = L_B1
+        
+        self.Id_1 = Id_1
+        self.R_LCG = R_LCG
+        
+        r1 = self.M1._set_raw (self.W_L1,  self.L_L1,  self.Id_1)
+        r2 = self.M1L._set_raw(self.W_1,   self.L_1,   self.Id_1)
+        r3 = self.M1B._set_raw(self.W_B1,  self.L_B1,  self.Id_1)
+        if r1 == -1 or r2 == -1 or r3 == -1:
+            print('failed to set a mosfet parameters in CG.')
+            return -1  
+#        self.Rin_approx = 1/self.M1.gmp
+#        self.Cin_approx = self.M1.cgs + self.M1.csb
+#        self.Cout_approx = self.M1.cgd + self.M1.cdb
+        self.Rin  = (self.M1.ro + 2*self.R_LCG) / (self.M1.gmp*(self.M1.ro + self.R_LCG))
+        self.Rout = ee.parallel(2*self.M1.ro, self.R_LCG)
+        self.Cin  = self.M1.cgs + self.M1.csb + self.M1B.cgd + self.M1B.cdb + self.C_IN
+        self.Cout = self.M1.cgd + self.M1.cdb + self.M1L.cgd + self.M1L.cdb
+        self.TI   = self.Rout
+        self._print()
         return 0
         
     def get_TI(self):
@@ -301,13 +351,20 @@ def unit_test_CG():
     r = cg._set(0.2, 0.4, 0.4, 1E-5, 10000)
 #    print(f'r: {r}')
     cg._print()
+    
+def unit_test_raw_CG():
+    print('--- CG unit test --------------')
+    cg = CG()
+    r = cg._set_raw(5.2, 2, 6.4, 1, 4.2, 2, 2.6E-5, 3.2E+4)
+#    print(f'r: {r}')
+    cg._print()
 
-#unit_test_CG()
+#unit_test_raw_CG()
 
 #%% CS
 class CS(mosfet):
     def __init__(self):
-        print_mosfet = 0
+        print_mosfet = 1
         self.M2   = mosfet('M2',  1, print_mosfet)
         self.M2L  = mosfet('M2L', 2, print_mosfet)
         self.M2B  = mosfet('M2B', 2, print_mosfet)
@@ -320,7 +377,8 @@ class CS(mosfet):
 
     def _print(self):
         print('CS stage parameters:')
-        ee.print_A('   |A| ', 'V/V', self.A1)
+#        ee.print_A('   |A| ', 'V/V', self.A1)
+        ee.print_A('   |A| ', 'V/V', (self.M2L.Vov / self.M2.Vov) )
         ee.print_R('   Rin ', self.Rin)
         ee.print_R('   Rout', self.Rout)
         ee.print_C('   Cin ', self.Cin)
@@ -343,6 +401,36 @@ class CS(mosfet):
         self.Cout = (1+1/self.A1)*self.M2.cgd + self.M2.cdb + self.M2L.csb + self.M2L.cgs
         return 0
     
+    def _set_raw(self, W_L2, L_L2, W_2, L_2, W_B2, L_B2, Id_2):
+        print('CS._set_raw')
+        self.W_L2 = W_L2
+        self.L_L2 = L_L2
+        
+        self.W_2  = W_2
+        self.L_2  = L_2
+        
+        self.W_B2 = W_B2
+        self.L_B2 = L_B2
+        
+        self.Id_2 = Id_2
+
+        r1 = self.M2L._set_raw(self.W_L2, self.L_L2, self.Id_2)
+        r2 = self.M2._set_raw (self.W_2,  self.L_2,  self.Id_2)
+        r3 = self.M2B._set_raw(self.W_B2, self.L_B2, self.Id_2)
+        
+        if r1 == -1 or r2 == -1 or r3 == -1:
+            return -1      
+        if self.M2L.Vov > 0.68:
+            return -2
+        
+        self.Rin  = 1E+21
+        self.Rout = ee.parallel(0.5*self.M2.ro, 1/(self.M2L.gmp))
+        self.Cin  = self.M2.cgs + (1+self.A1)*self.M2.cgd
+        self.Cout = (1+1/self.A1)*self.M2.cgd + self.M2.cdb + self.M2L.csb + self.M2L.cgs
+        self._print()
+        return 0
+    
+    
     def get_Rin(self):
         return self.Rin
     def get_Rout(self):
@@ -362,7 +450,15 @@ def unit_test_CS():
     cs._print()
     print()
 
-#unit_test_CS()
+def unit_test_raw_CS():
+    print('--- CS_unit_test --------------------')
+    cs = CS()
+    r = cs._set_raw(3.2, 2, 7.0, 1, 2.8, 2, 18E-6)
+    print(f'r: {r}')
+    cs._print()
+    print()
+    
+#unit_test_raw_CS()
 
 #%% CD
 class CD(mosfet):
@@ -406,6 +502,33 @@ class CD(mosfet):
 #        self._print()
         return 0
     
+    def _set_raw(self, W_3, L_3, W_B3, L_B3, Id_3):
+        print('CS._set_raw')
+        self.W_3  = W_3
+        self.L_3  = L_3
+        
+        self.W_B3 = W_B3
+        self.L_B3 = L_B3
+        self.Id_3 = Id_3
+        
+        r1 = self.M3._set_raw(self.W_3, self.L_3, self.Id_3)
+        r2 = self.M3B._set_raw(self.W_B3, self.L_B3, self.Id_3)
+        
+        if r1 == -1 or r2 == -1:
+            return -1  
+        
+        self.Rin  = 1E+21
+        self.Rout = ee.parallel( 1 / self.M3.gmp, ee.parallel(0.5*self.M3.ro, self.R_OUT))
+        self.Rout_check= ee.parallel(1 / self.M3.gmp, self.R_OUT)
+        self.Cin  = self.M3.cgd + (1+self.A2)*self.M3.cgs
+        self.Cout = (1+1/self.A2)*self.M3.cgs + self.M3.csb + self.M3B.cgd + self.M3B.cdb + self.C_OUT
+        self.A2   = -self.M3.gm*self.Rout
+#        self._print()
+        self._print()
+        return 0
+        
+        
+    
     def get_A2(self):
         return self.A2
     def get_Rin(self):
@@ -425,6 +548,17 @@ def unit_test_CD():
     print('')
 
 #unit_test_CD()
+    
+    
+    
+def unit_test_raw_CD():
+    print('--- CD_unit_test ---------------------')
+    cd = CD()
+    cd._set_raw(36.6, 1, 9.6, 2, 62E-6)
+    cd._print()
+    print('')
+
+#unit_test_raw_CD()
 
 #%% Power Control Module
 class PCM():
@@ -528,6 +662,35 @@ class CM:
         self.Mi1._set(self.Vov_N, Id_mirror)
         self.Mi2._set(self.Vov_N, Id_mirror)
         self.Mi3._set(self.Vov_P, Id_mirror)
+        
+        self.mirror_results.append([self.Mi1._get_W(), self.Mi1._get_L()])
+        self.mirror_results.append([self.Mi2._get_W(), self.Mi2._get_L()])
+        self.mirror_results.append([self.Mi3._get_W(), self.Mi3._get_L()])
+        
+    def _set_raw(self, W_3, L_3, W_B3, L_B3, Id_3):
+        print('CS._set_raw')
+        self.W_3  = W_3
+        self.L_3  = L_3
+        
+        self.W_B3 = W_B3
+        self.L_B3 = L_B3
+        self.Id_3 = Id_3
+        
+    def _set_raw(self, W_i1, L_i1, W_i2, L_i2, W_i3, L_i3, I_ref):
+        self.W_i1 = W_i1
+        self.L_i1 = L_i1
+        
+        self.W_i2 = W_i2
+        self.L_i2 = L_i2
+        
+        self.W_i3 = W_i3
+        self.L_i3 = L_i3
+        self.I_ref = I_ref
+        
+        # calculate Mi1, Mi2, Mi3 sizing
+        self.Mi1._set_raw(self.W_i1, self.L_i1, self.I_ref)
+        self.Mi2._set_raw(self.W_i2, self.L_i2, self.I_ref)
+        self.Mi3._set_raw(self.W_i3, self.L_i3, self.I_ref)
         
         self.mirror_results.append([self.Mi1._get_W(), self.Mi1._get_L()])
         self.mirror_results.append([self.Mi2._get_W(), self.Mi2._get_L()])
